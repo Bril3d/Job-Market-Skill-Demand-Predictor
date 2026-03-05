@@ -1,117 +1,98 @@
 import pytest
-import sys
-import os
-import importlib.util
-
-# Load code/app.py manually since 'code' conflicts with Python built-in
-spec = importlib.util.spec_from_file_location("app", os.path.join(os.path.dirname(__file__), "..", "code", "app.py"))
-app_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(app_module)
-app = app_module.app
-
 from fastapi.testclient import TestClient
+from code.app import app
+import os
+
 client = TestClient(app)
 
+# Bypass API Key for testing if needed or use the dev key
+HEADERS = {"X-API-Key": "sg-dev-key-2026"}
 
-class TestHealthEndpoint:
-    def test_health_returns_200(self):
-        response = client.get("/health")
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+    assert response.json()["api_version"] == "3.0.0"
+
+def test_metrics_endpoint():
+    # This test assumes modeling.py has been run and data/evaluation_metrics.json exists
+    if os.path.exists("data/evaluation_metrics.json"):
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "accuracy" in response.json()
+        assert "f1_high" in response.json()
+    else:
+        pytest.skip("Metrics file not found, skipping test")
+
+def test_insights_endpoint():
+    if os.path.exists("data/features_jobs.csv"):
+        response = client.get("/insights")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "healthy"
-        assert "model_loaded" in data
-        assert data["api_version"] == "2.0.0"
-
-    def test_health_has_predictions_count(self):
-        response = client.get("/health")
-        data = response.json()
-        assert "predictions_served" in data
-
-
-class TestMetricsEndpoint:
-    def test_metrics_returns_data(self):
-        response = client.get("/metrics")
-        if response.status_code == 200:
-            data = response.json()
-            assert "accuracy" in data
-            assert "precision" in data
-            assert "recall" in data
-
-
-class TestInsightsEndpoint:
-    def test_insights_returns_data(self):
-        response = client.get("/insights")
-        if response.status_code == 200:
-            data = response.json()
-            assert "total_jobs" in data
-            assert "categories" in data
-            assert "seniority_breakdown" in data
-            assert "high_salary_rate" in data
-
+        assert "high_demand_rate" in data
+        assert "categories" in data
+        assert "total_jobs" in data
+    else:
+        pytest.skip("Processed data not found, skipping test")
 
 class TestPredictionEndpoint:
-    def test_single_prediction(self):
+    def test_single_prediction_high_demand(self):
         payload = {
-            "title": "Senior Machine Learning Engineer",
+            "title": "Senior AI Researcher",
             "seniority": "Senior",
             "category": "ML Engineering",
             "geo_tier": "Tier 1",
-            "tags": "python, pytorch, aws"
+            "tags": ["python", "pytorch", "transformers", "research", "machine learning"]
         }
-        response = client.post("/predict", json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            assert "prediction" in data
-            assert data["prediction"] in [0, 1]
-            assert 0 <= data["probability"] <= 1
-            assert "label" in data
-            assert "experience_detected" in data
+        response = client.post("/predict", json=payload, headers=HEADERS)
+        assert response.status_code == 200
+        data = response.json()
+        assert "prediction" in data
+        assert "probability" in data
+        assert "demand_score" in data
+        assert "label" in data
+        assert data["experience_detected"] >= 0
 
-    def test_prediction_without_optional_fields(self):
-        payload = {"title": "Web Developer"}
-        response = client.post("/predict", json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            assert "prediction" in data
-
-    def test_prediction_missing_title_fails(self):
-        payload = {"seniority": "Senior"}
-        response = client.post("/predict", json=payload)
-        assert response.status_code == 422  # Validation error
+    def test_single_prediction_low_demand(self):
+        payload = {
+            "title": "Data Entry Clerk",
+            "seniority": "Junior",
+            "category": "Others",
+            "geo_tier": "Tier 2",
+            "tags": ["excel"]
+        }
+        response = client.post("/predict", json=payload, headers=HEADERS)
+        assert response.status_code == 200
+        assert response.json()["prediction"] in [0, 1]
 
     def test_batch_prediction(self):
         payload = [
-            {"title": "Senior Backend Engineer", "seniority": "Senior", "tags": "python, django"},
-            {"title": "Junior Frontend Dev", "seniority": "Junior", "tags": "html, css"}
+            {
+                "title": "DevOps Engineer",
+                "tags": ["aws", "terraform", "docker"]
+            },
+            {
+                "title": "Receptionist",
+                "tags": ["typing"]
+            }
         ]
-        response = client.post("/predict/batch", json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            assert isinstance(data, list)
-            assert len(data) == 2
-
-
-class TestHistoryEndpoint:
-    def test_history_returns_list(self):
-        response = client.get("/history")
+        response = client.post("/predict/batch", json=payload, headers=HEADERS)
         assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
+        assert len(response.json()) == 2
+        assert "prediction" in response.json()[0]
 
-
-class TestAPIKeyAuth:
-    def test_predict_with_wrong_key_fails(self):
-        payload = {"title": "Engineer"}
-        response = client.post(
-            "/predict",
-            json=payload,
-            headers={"X-API-Key": "wrong-key"}
-        )
+    def test_invalid_api_key(self):
+        response = client.post("/predict", json={}, headers={"X-API-Key": "wrong-key"})
         assert response.status_code == 403
 
-    def test_predict_without_key_still_works(self):
-        """API key is optional (auto_error=False), so no key = allowed."""
-        payload = {"title": "Engineer"}
-        response = client.post("/predict", json=payload)
-        # Should not be 403
-        assert response.status_code != 403
+def test_history_endpoint():
+    # Trigger a prediction first
+    client.post("/predict", json={
+        "title": "Software Engineer",
+        "tags": ["python"]
+    }, headers=HEADERS)
+    
+    response = client.get("/history")
+    assert response.status_code == 200
+    assert len(response.json()) > 0
+    assert "timestamp" in response.json()[0]
