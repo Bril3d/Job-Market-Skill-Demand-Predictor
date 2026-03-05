@@ -1,70 +1,70 @@
-import { useState } from 'react'
-import Dashboard from './components/Dashboard'
-import PredictionForm from './components/PredictionForm'
-import { LayoutDashboard, Target, Moon, Sun, Github } from 'lucide-react'
+import React, { useState, useEffect } from 'react';
+import PredictionForm from './components/PredictionForm';
+import Dashboard from './components/Dashboard';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('insights')
-  const [darkMode, setDarkMode] = useState(true)
+const App = () => {
+  const [activeTab, setActiveTab] = useState('predictor');
+  const [darkMode, setDarkMode] = useState(true);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Navigation */}
-      <nav className={`border-b sticky top-0 z-50 backdrop-blur-md ${darkMode ? 'border-white/5 bg-slate-900/80' : 'border-gray-200 bg-white/80'}`}>
-        <div className="container mx-auto px-4 flex items-center justify-between py-3">
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-[#0f1014] text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
+      {/* Header */}
+      <nav className="border-b border-gray-800/50 backdrop-blur-xl sticky top-0 z-50 bg-opacity-80">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <LayoutDashboard className="text-white" size={20} />
+            <div className={`p-2 rounded-lg bg-gradient-to-tr ${darkMode ? 'from-blue-600 to-cyan-500' : 'from-blue-500 to-indigo-600'}`}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
             </div>
-            <div>
-              <span className="text-xl font-bold">SalaryGenius <span className="text-sky-400">AI</span></span>
-              <span className="text-xs text-slate-500 ml-2 hidden sm:inline">v2.0</span>
-            </div>
+            <span className="text-xl font-bold tracking-tight">
+              SkillDemand <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">AI</span>
+            </span>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <div className={`flex p-1 rounded-lg ${darkMode ? 'bg-slate-800/50' : 'bg-gray-100'}`}>
-              <button 
-                onClick={() => setActiveTab('insights')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'insights' ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30' : darkMode ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                <LayoutDashboard size={16} /> Insights
-              </button>
-              <button 
+
+          <div className="flex items-center gap-8">
+            <div className="flex gap-1 p-1 bg-gray-900/50 rounded-xl border border-gray-800">
+              <button
                 onClick={() => setActiveTab('predictor')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'predictor' ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30' : darkMode ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'predictor' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white'}`}
               >
-                <Target size={16} /> Predictor
+                Predictor
+              </button>
+              <button
+                onClick={() => setActiveTab('insights')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'insights' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white'}`}
+              >
+                Insights
               </button>
             </div>
 
-            <button 
+            <button
               onClick={() => setDarkMode(!darkMode)}
-              className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-gray-200 text-gray-600'}`}
-              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="p-2.5 rounded-xl border border-gray-800 hover:bg-gray-800/50 transition-colors"
             >
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+              {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="min-h-[calc(100vh-120px)]">
-        {activeTab === 'insights' ? <Dashboard darkMode={darkMode} /> : <PredictionForm darkMode={darkMode} />}
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        {activeTab === 'predictor' ? <PredictionForm darkMode={darkMode} /> : <Dashboard darkMode={darkMode} />}
       </main>
 
-      <footer className={`border-t py-6 mt-12 ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
-        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-gray-500'}`}>
-            © 2026 SalaryGenius AI — FastAPI + React + ML Pipeline
-          </p>
-          <a href="https://github.com" target="_blank" rel="noopener noreferrer" className={`text-sm flex items-center gap-1 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}>
-            <Github size={14} /> Source Code
-          </a>
-        </div>
+      <footer className="mt-auto border-t border-gray-800/30 py-8 px-6 text-center text-sm text-gray-500">
+        <p>© 2026 SkillDemand AI Engine • Advanced Labor Market Analytics</p>
       </footer>
     </div>
-  )
-}
+  );
+};
 
-export default App
+export default App;

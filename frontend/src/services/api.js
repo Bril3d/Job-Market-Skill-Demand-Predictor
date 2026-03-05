@@ -1,38 +1,38 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = 'http://localhost:8000';
+const API_KEY = 'sg-dev-key-2026';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: {
+    'X-API-Key': API_KEY,
+    'Content-Type': 'application/json'
+  }
 });
 
-export const getHealth = async () => {
-  const response = await api.get('/health');
+export const predictDemand = async (jobData) => {
+  // Convert comma separated tags to array
+  const tags = typeof jobData.tags === 'string' 
+    ? jobData.tags.split(',').map(t => t.strip()).filter(t => t.length > 0)
+    : jobData.tags;
+    
+  const response = await api.post('/predict', { ...jobData, tags });
+  return response.data;
+};
+
+export const getInsights = async () => {
+  const response = await api.get('/insights');
   return response.data;
 };
 
 export const getMetrics = async () => {
-  try {
-    const response = await api.get('/metrics');
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching metrics:", error);
-    return null;
-  }
+  const response = await api.get('/metrics');
+  return response.data;
 };
 
-export const getInsights = async () => {
-  try {
-    const response = await api.get('/insights');
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching insights:", error);
-    return null;
-  }
-};
-
-export const predictSalary = async (jobData) => {
-  const response = await api.post('/predict', jobData);
+export const getHistory = async () => {
+  const response = await api.get('/history');
   return response.data;
 };
 

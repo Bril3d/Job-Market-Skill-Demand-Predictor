@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { predictSalary } from '../services/api';
-import { Brain, Loader2, Sparkles, Target, Clock, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { predictDemand } from '../services/api';
 
 const PredictionForm = ({ darkMode }) => {
   const [formData, setFormData] = useState({
@@ -10,177 +9,175 @@ const PredictionForm = ({ darkMode }) => {
     geo_tier: 'Tier 1',
     tags: ''
   });
-
+  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await predictSalary(formData);
+      const data = await predictDemand(formData);
       setResult(data);
-      setHistory(prev => [{ ...data, title: formData.title, timestamp: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
+      setHistory(prev => [{ ...data, ...formData, timestamp: new Date().toLocaleTimeString() }, ...prev].slice(0, 5));
     } catch (error) {
-      console.error("Prediction failed:", error);
+      console.error("Prediction failed", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const exportHistory = () => {
-    if (history.length === 0) return;
-    const rows = [["Title", "Prediction", "Probability", "Threshold", "Time"]];
-    history.forEach(h => rows.push([h.title, h.label, h.probability.toFixed(4), h.threshold.toFixed(4), h.timestamp]));
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "prediction_history.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const cardBg = darkMode ? 'glass-card' : 'bg-white rounded-2xl p-6 shadow-md border border-gray-100';
-  const inputBg = darkMode ? 'input-field' : 'bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-lg w-full mb-4 outline-none focus:border-sky-400 transition-colors';
+  const categories = ["Backend", "Frontend", "Data Engineering", "Data Science", "ML Engineering", "DevOps", "Management", "Others"];
+  const seniorityLevels = ["Junior", "Mid-Level", "Senior", "Staff/Principal"];
+  const tiers = ["Tier 1", "Tier 2"];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Form Section */}
-        <div className={cardBg}>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Brain className="text-sky-400" /> Salary Predictor
-          </h2>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={`text-sm mb-2 block ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Job Title</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Senior ML Engineer"
-                  className={inputBg}
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  required
-                />
-              </div>
-              <div>
-                <label className={`text-sm mb-2 block ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Category</label>
-                <select className={inputBg} value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}>
-                  <option>Backend</option>
-                  <option>Data Science</option>
-                  <option>ML Engineering</option>
-                  <option>DevOps</option>
-                  <option>Frontend</option>
-                  <option>Management</option>
-                  <option>Others</option>
-                </select>
-              </div>
-              <div>
-                <label className={`text-sm mb-2 block ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Seniority</label>
-                <select className={inputBg} value={formData.seniority} onChange={(e) => setFormData({...formData, seniority: e.target.value})}>
-                  <option>Junior</option>
-                  <option>Mid-Level</option>
-                  <option>Senior</option>
-                  <option>Staff/Principal</option>
-                </select>
-              </div>
-              <div>
-                <label className={`text-sm mb-2 block ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Geo Tier</label>
-                <select className={inputBg} value={formData.geo_tier} onChange={(e) => setFormData({...formData, geo_tier: e.target.value})}>
-                  <option>Tier 1</option>
-                  <option>Tier 2</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-4">
-              <label className={`text-sm mb-2 block ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Tags (comma separated)</label>
-              <textarea 
-                className={`${inputBg} h-24 resize-none`}
-                placeholder="python, pytorch, aws, kubernetes..."
-                value={formData.tags}
-                onChange={(e) => setFormData({...formData, tags: e.target.value})}
-              />
-            </div>
-            <button 
-              type="submit" 
-              className="primary-btn w-full mt-6 flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-              {loading ? 'Analyzing...' : 'Predict High Salary Potential'}
-            </button>
-          </form>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Form Section */}
+      <div className="lg:col-span-7 bg-[#1a1c23] border border-gray-800/50 rounded-3xl p-8 shadow-2xl">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-2">Skill Demand Predictor</h2>
+          <p className="text-gray-400">Deep analysis of tech stack demand and market relevance.</p>
         </div>
 
-        {/* Results Section */}
-        <div className="flex flex-col gap-6">
-          <div className={`${cardBg} flex-1 flex flex-col items-center justify-center text-center`}>
-            {!result ? (
-              <div className="py-12">
-                <Target size={64} className="text-sky-500/20 mx-auto mb-4" />
-                <h3 className={`text-xl ${darkMode ? 'text-slate-400' : 'text-gray-400'}`}>Awaiting Input</h3>
-                <p className={`text-sm mt-2 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>Enter job details to see AI predictions</p>
-              </div>
-            ) : (
-              <div className="w-full">
-                <div className={`text-6xl font-black mb-4 ${result.prediction === 1 ? 'text-emerald-400' : 'text-sky-400'}`}>
-                  {result.prediction === 1 ? '✓ YES' : '✗ NO'}
-                </div>
-                <h3 className="text-2xl font-bold mb-2">{result.label}</h3>
-                <div className={`flex items-center justify-center gap-2 mb-6 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                  <Target size={18} /> Confidence: <span className={darkMode ? 'text-white' : 'text-gray-900'}>{(result.probability * 100).toFixed(1)}%</span>
-                </div>
-                
-                {/* Confidence Meter */}
-                <div className={`w-full max-w-xs h-3 rounded-full overflow-hidden mx-auto mb-6 ${darkMode ? 'bg-slate-800 border border-white/5' : 'bg-gray-200'}`}>
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ease-out ${result.prediction === 1 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 'bg-gradient-to-r from-sky-500 to-sky-400'}`}
-                    style={{ width: `${result.probability * 100}%` }}
-                  ></div>
-                </div>
-                
-                {result.experience_detected > 0 && (
-                  <p className="text-sm text-amber-400 mb-2">
-                    📋 Detected: {result.experience_detected}+ years experience requirement
-                  </p>
-                )}
-                <p className={`text-sm italic ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                  Threshold: {result.threshold.toFixed(4)}
-                </p>
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-400 px-1">Job Title</label>
+            <input
+              type="text"
+              required
+              className="w-full bg-gray-900/50 border border-gray-700/50 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+              placeholder="e.g. Senior Machine Learning Engineer"
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
+            />
           </div>
 
-          {/* Prediction History */}
-          {history.length > 0 && (
-            <div className={cardBg}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Clock size={18} className="text-sky-400" /> Recent Predictions
-                </h3>
-                <button onClick={exportHistory} className={`text-xs flex items-center gap-1 ${darkMode ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}>
-                  <Download size={14} /> Export
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400 px-1">Seniority</label>
+              <select
+                className="w-full bg-gray-900/50 border border-gray-700/50 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                value={formData.seniority}
+                onChange={e => setFormData({ ...formData, seniority: e.target.value })}
+              >
+                {seniorityLevels.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400 px-1">Category</label>
+              <select
+                className="w-full bg-gray-900/50 border border-gray-700/50 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                value={formData.category}
+                onChange={e => setFormData({ ...formData, category: e.target.value })}
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-400 px-1">Geographic Tier</label>
+            <div className="flex gap-4 p-1 bg-gray-900/50 rounded-2xl border border-gray-700/50">
+              {tiers.map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, geo_tier: t })}
+                  className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${formData.geo_tier === t ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                  {t}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-400 px-1">Technology Tags (Comma Separated)</label>
+            <textarea
+              className="w-full bg-gray-900/50 border border-gray-700/50 rounded-2xl px-5 py-4 h-32 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all resize-none"
+              placeholder="e.g. Python, PyTorch, AWS, Docker, NLP"
+              value={formData.tags}
+              onChange={e => setFormData({ ...formData, tags: e.target.value })}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/20 transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            {loading ? 'Analyzing Complexity...' : 'Generate Demand Prediction'}
+          </button>
+        </form>
+      </div>
+
+      {/* Result Section */}
+      <div className="lg:col-span-5 space-y-6">
+        {result ? (
+          <div className="bg-gradient-to-br from-gray-900 to-black border border-blue-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/20 transition-all"></div>
+            
+            <span className="text-blue-400 text-xs font-bold uppercase tracking-widest block mb-4">Analysis Complete</span>
+            <h3 className="text-3xl font-bold mb-6">{result.label}</h3>
+            
+            <div className="space-y-6 mb-8">
+              <div className="flex justify-between items-end">
+                <span className="text-gray-400">Demand Confidence</span>
+                <span className="text-2xl font-mono text-cyan-400">{(result.probability * 100).toFixed(1)}%</span>
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {history.map((h, i) => (
-                  <div key={i} className={`flex items-center justify-between py-2 px-3 rounded-lg text-sm ${darkMode ? 'bg-slate-800/50' : 'bg-gray-50'}`}>
-                    <span className="truncate max-w-[180px]">{h.title}</span>
-                    <div className="flex items-center gap-3">
-                      <span className={h.prediction === 1 ? 'text-emerald-400' : 'text-sky-400'}>
-                        {(h.probability * 100).toFixed(0)}%
-                      </span>
-                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>{h.timestamp}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-1000 ease-out"
+                  style={{ width: `${result.probability * 100}%` }}
+                ></div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-800/30 p-4 rounded-2xl border border-gray-700/30">
+                  <span className="text-gray-500 text-xs block mb-1">Demand Score</span>
+                  <span className="text-xl font-bold text-white">{result.demand_score.toFixed(2)}</span>
+                </div>
+                <div className="bg-gray-800/30 p-4 rounded-2xl border border-gray-700/30">
+                  <span className="text-gray-500 text-xs block mb-1">Threshold</span>
+                  <span className="text-xl font-bold text-white">{result.threshold.toFixed(2)}</span>
+                </div>
               </div>
             </div>
-          )}
+
+            <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10 text-sm text-blue-200 leading-relaxed italic">
+              "This tech stack represents a {result.prediction === 1 ? 'highly competitive' : 'stable'} demand profile in the current market environment."
+            </div>
+          </div>
+        ) : (
+          <div className="bg-[#1a1c23] border border-gray-800 border-dashed rounded-3xl p-12 text-center">
+            <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <span className="text-2xl">⚡</span>
+            </div>
+            <p className="text-gray-500">Enter job details to see the skill demand analysis.</p>
+          </div>
+        )}
+
+        {/* Recent History Mini-Widget */}
+        <div className="bg-[#1a1c23]/50 border border-gray-800/50 rounded-3xl p-6">
+          <h4 className="font-bold mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+            Recent Analysis
+          </h4>
+          <div className="space-y-3">
+            {history.map((item, i) => (
+              <div key={i} className="flex justify-between items-center p-3 hover:bg-gray-800/30 rounded-xl transition-colors cursor-default border border-transparent hover:border-gray-700/30">
+                <div className="max-w-[70%]">
+                  <p className="text-sm font-medium truncate">{item.title}</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{item.timestamp} • {item.seniority}</p>
+                </div>
+                <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${item.prediction === 1 ? 'bg-blue-500/10 text-blue-400' : 'bg-gray-700/20 text-gray-500'}`}>
+                  {item.prediction === 1 ? 'HIGH' : 'STND'}
+                </span>
+              </div>
+            ))}
+            {history.length === 0 && <p className="text-xs text-gray-600 italic">No recent activity yet.</p>}
+          </div>
         </div>
       </div>
     </div>
