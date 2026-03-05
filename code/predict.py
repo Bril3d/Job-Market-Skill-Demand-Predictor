@@ -52,7 +52,7 @@ def predict_salary(job_data, model_path="models/salary_model.joblib"):
     
     final_input = pd.concat([input_df, tag_df, title_tfidf_df], axis=1)
 
-    # 4. Predict
+    # 4. Predict 
     probability = model.predict_proba(final_input)[0][1]
     prediction = 1 if probability >= threshold else 0
 

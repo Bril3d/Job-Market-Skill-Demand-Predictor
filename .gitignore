@@ -28,7 +28,6 @@ share/python-wheels/
 MANIFEST
 
 # Environment
-.env
 .venv
 env/
 venv/
@@ -51,6 +50,17 @@ data/*.json
 *.csv
 *.sqlite
 *.db
+
+# ML Artifacts
+mlruns/
+models/*.joblib
+
+# Logs
+*.log
+*.txt
+
+# Node
+node_modules/
 
 # OS
 .DS_Store
