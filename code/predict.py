@@ -12,9 +12,9 @@ def extract_experience(title, tags):
         return max([int(m) for m in matches])
     return 0
 
-def predict_salary(job_data, model_path="models/salary_model.joblib"):
+def predict_demand(job_data, model_path="models/demand_model.joblib"):
     """
-    Predicts if a job is high-salary ($120k+) based on input data.
+    Predicts if a job has high skill demand based on input data.
     job_data: dict with keys ['seniority', 'category', 'geo_tier', 'tags', 'title']
     """
     if not os.path.exists(model_path):
@@ -31,23 +31,46 @@ def predict_salary(job_data, model_path="models/salary_model.joblib"):
         with open("models/threshold.json", "r") as f:
             threshold = json.load(f)["threshold"]
 
-    # 1. Process Tags (Multi-Hot)
-    tags_str = job_data.get("tags", "")
-    tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+    # 1. Process Tags
+    tags = job_data.get("tags", [])
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(",") if t.strip()]
+    
+    tags_str = ", ".join(tags)
     tag_encoded = tag_binarizer.transform([tags])
     tag_cols = [f"tag_{c}" for c in tag_binarizer.classes_]
     tag_df = pd.DataFrame(tag_encoded, columns=tag_cols)
 
-    # 2. Process Title (TF-IDF)
-    title_encoded = title_tfidf.transform([job_data.get("title", "")])
-    title_tfidf_df = pd.DataFrame(title_encoded.toarray(), columns=[f"title_tfidf_{i}" for i in range(200)])
+    # 2. Process Title
+    title = job_data.get("title", "")
+    title_encoded = title_tfidf.transform([title])
+    n_tfidf = len(title_tfidf.get_feature_names_out())
+    title_tfidf_df = pd.DataFrame(title_encoded.toarray(), columns=[f"title_tfidf_{i}" for i in range(n_tfidf)])
 
-    # 3. Combine with Categorical and Experience
+    # 3. Engineered Features
+    years_exp = extract_experience(title, tags_str)
+    
+    def check_keywords(tag_list, keywords):
+        return 1 if any(kw in " ".join(tag_list).lower() for kw in keywords) else 0
+
+    num_skills = len(tags)
+    has_ai = check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"])
+    has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
+    has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
+    has_frontend = check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"])
+    tag_frequency_score = min(num_skills / 10.0, 1.0) 
+
     input_df = pd.DataFrame([{
         "seniority": job_data.get("seniority", "Mid-Level"),
         "category": job_data.get("category", "Others"),
         "geo_tier": job_data.get("geo_tier", "Tier 2"),
-        "years_exp": extract_experience(job_data.get("title", ""), tags_str)
+        "years_exp": years_exp,
+        "num_skills": num_skills,
+        "has_ai": has_ai,
+        "has_cloud": has_cloud,
+        "has_backend": has_backend,
+        "has_frontend": has_frontend,
+        "tag_frequency_score": tag_frequency_score
     }])
     
     final_input = pd.concat([input_df, tag_df, title_tfidf_df], axis=1)
@@ -66,23 +89,23 @@ if __name__ == "__main__":
             "seniority": "Senior",
             "category": "ML Engineering",
             "geo_tier": "Tier 1",
-            "tags": "python, pytorch, aws, kubernetes"
+            "tags": ["python", "pytorch", "aws", "kubernetes"]
         },
         {
             "title": "Junior Web Developer",
             "seniority": "Junior",
             "category": "Frontend",
             "geo_tier": "Tier 2",
-            "tags": "html, css, javascript"
+            "tags": ["html", "css", "javascript"]
         }
     ]
 
-    print("--- Salary Prediction Testing ---\n")
+    print("--- Skill Demand Prediction Testing ---\n")
     for job in test_jobs:
-        pred, prob, thresh = predict_salary(job)
-        label = "High Salary ($120k+)" if pred == 1 else "Standard Salary (<$120k)"
+        pred, prob, thresh = predict_demand(job)
+        label = "High Demand Skillset" if pred == 1 else "Standard Demand Skillset"
         print(f"Job: {job['title']}")
         print(f"Prediction: {label}")
-        print(f"Confidence (High Salary): {prob:.2%}")
+        print(f"Confidence: {prob:.2%}")
         print(f"Threshold Used: {thresh:.4f}")
         print("-" * 30)

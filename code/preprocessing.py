@@ -6,33 +6,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MultiLabelBinarizer
 import joblib
 
-def parse_salary(salary_str):
-    """
-    Parses salary strings and annualizes them.
-    Examples:
-    - "100000 - 150000" -> 125000
-    - "80/hr" -> 80 * 2080 = 166400
-    - "120000" -> 120000
-    """
-    if pd.isna(salary_str) or salary_str == "" or salary_str == "0":
-        return None
-    
-    salary_str = str(salary_str).lower().replace(",", "")
-    
-    # Handle hourly rates
-    hourly_match = re.search(r"(\d+)\s*/\s*hr", salary_str)
-    if hourly_match:
-        return float(hourly_match.group(1)) * 2080
-    
-    # Handle ranges (e.g., "100000 - 150000")
-    range_match = re.findall(r"\d+", salary_str)
-    if len(range_match) >= 2:
-        return (float(range_match[0]) + float(range_match[1])) / 2
-    elif len(range_match) == 1:
-        return float(range_match[0])
-    
-    return None
-
 def extract_seniority(title):
     title = str(title).lower()
     if any(word in title for word in ["intern", "student", "early career", "junior", "jr"]):
@@ -74,55 +47,116 @@ def extract_experience(title, tags):
     Returns 0 if not found.
     """
     text = (str(title) + " " + str(tags)).lower()
-    # Look for "X+ years", "X years", "X-Y years"
     matches = re.findall(r"(\d+)\s*\+?\s*years?", text)
     if matches:
         return max([int(m) for m in matches])
     return 0
 
-def preprocess_data(input_path, output_path):
+def compute_demand_features(df):
+    """
+    Computes demand_score and demand_label based on tag frequency.
+    """
+    print("\nComputing Demand Features...")
+    
+    # 1. Parse tags list
+    df["tag_list"] = df["tags"].fillna("").apply(lambda x: [t.strip().lower() for t in str(x).split(",") if t.strip()])
+    
+    # 2. Count global skill frequency
+    all_tags = [tag for sublist in df["tag_list"] for tag in sublist]
+    tag_counts = pd.Series(all_tags).value_counts().to_dict()
+    print(f"  Unique tags found: {len(tag_counts)}")
+    
+    # 3. Compute demand_score per job (sum of tag frequencies)
+    df["demand_score"] = df["tag_list"].apply(lambda tags: sum([tag_counts.get(tag, 0) for tag in tags]))
+    
+    # 4. Normalize demand_score to [0, 1]
+    max_score = df["demand_score"].max()
+    if max_score > 0:
+        df["demand_score_norm"] = df["demand_score"] / max_score
+    else:
+        df["demand_score_norm"] = 0
+        
+    # 5. Create demand_label (1 if > median demand_score)
+    median_score = df["demand_score"].median()
+    df["demand_label"] = (df["demand_score"] > median_score).astype(int)
+    
+    print(f"  Demand Score Range: {df['demand_score'].min()} - {df['demand_score'].max()}")
+    print(f"  Median Demand Score: {median_score}")
+    print(f"  Label distribution: {df['demand_label'].value_counts(normalize=True).to_dict()}")
+    
+    return df
+
+def add_engineered_features(df):
+    """
+    Adds binary features based on keyword groups in tags.
+    """
+    print("Adding engineered features...")
+    
+    # Helper to check keywords in tag list
+    def check_keywords(tag_list, keywords):
+        return 1 if any(kw in " ".join(tag_list) for kw in keywords) else 0
+
+    df["num_skills"] = df["tag_list"].apply(len)
+    df["has_ai"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"]))
+    df["has_cloud"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"]))
+    df["has_backend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"]))
+    df["has_frontend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"]))
+    
+    # tag_frequency_score is already demand_score_norm
+    df["tag_frequency_score"] = df["demand_score_norm"]
+    
+    return df
+
+def preprocess_data(input_path, cleaned_path, features_path):
     print(f"Loading raw data from {input_path}...")
     df = pd.read_csv(input_path)
+    print(f"  Total jobs: {len(df)}")
     
-    # 1. Salary Cleaning & Annualization
-    print("Parsing salaries...")
-    df["annual_salary"] = df["salary"].apply(parse_salary)
-    
-    # 2. Target Generation (is_high_salary)
-    # 2025 threshold set to $120,000
-    df["is_high_salary"] = (df["annual_salary"] > 120000).astype(int)
-    
-    # 3. Domain Features
-    print("Extracting domain features...")
+    # 1. Domain Features (Basic Cleaning)
+    print("\nExtracting domain features...")
     df["seniority"] = df["title"].apply(extract_seniority)
     df["category"] = df.apply(lambda row: map_category(row["title"], row["tags"]), axis=1)
     df["geo_tier"] = df["location"].apply(map_geographic_tier)
     df["years_exp"] = df.apply(lambda row: extract_experience(row["title"], row["tags"]), axis=1)
     
+    # Save intermediate cleaned data
+    df.to_csv(cleaned_path, index=False)
+    print(f"Cleaned intermediate data saved to {cleaned_path}")
+    
+    # 2. Demand Target Generation
+    df = compute_demand_features(df)
+    
+    # 3. Feature Engineering
+    df = add_engineered_features(df)
+    
     # 4. Handle Tags (Multi-Hot)
-    print("Processing tags...")
-    df["tag_list"] = df["tags"].fillna("").apply(lambda x: [t.strip() for t in x.split(",") if t.strip()])
+    print("Processing tags for ML...")
     mlb = MultiLabelBinarizer()
     tag_encoded = mlb.fit_transform(df["tag_list"])
     tag_df = pd.DataFrame(tag_encoded, columns=[f"tag_{c}" for c in mlb.classes_])
     
-    # 5. TF-IDF on Title (Increased features for precision)
+    # 5. TF-IDF on Title
     print("Extracting TF-IDF features from titles...")
-    tfidf = TfidfVectorizer(max_features=200, stop_words="english")
+    n_features = min(200, len(df))
+    tfidf = TfidfVectorizer(max_features=n_features, stop_words="english")
     title_tfidf = tfidf.fit_transform(df["title"].fillna(""))
-    title_tfidf_df = pd.DataFrame(title_tfidf.toarray(), columns=[f"title_tfidf_{i}" for i in range(200)])
+    actual_features = title_tfidf.shape[1]
+    title_tfidf_df = pd.DataFrame(title_tfidf.toarray(), columns=[f"title_tfidf_{i}" for i in range(actual_features)])
     
     # 6. Combine Features
-    print("Combining features...")
-    final_df = pd.concat([df, tag_df, title_tfidf_df], axis=1)
+    print("Combining all features...")
+    # Select original cols + engineered + encoded
+    core_cols = ["title", "seniority", "category", "geo_tier", "years_exp", "num_skills", 
+                 "has_ai", "has_cloud", "has_backend", "has_frontend", 
+                 "tag_frequency_score", "demand_label"]
     
-    # Drop intermediate or non-numeric columns for the final ML dataset if needed,
-    # but for now we save the augmented dataframe
-    final_df.to_csv(output_path, index=False)
-    print(f"Processed data saved to {output_path}")
+    final_df = pd.concat([df[core_cols].reset_index(drop=True), tag_df, title_tfidf_df], axis=1)
+    
+    final_df.to_csv(features_path, index=False)
+    print(f"\nFinal features dataset saved to {features_path}")
     print(f"Final dataset shape: {final_df.shape}")
     
-    # Store the preprocessing artifacts for the model pipeline
+    # Store the preprocessing artifacts
     os.makedirs("models", exist_ok=True)
     joblib.dump(mlb, "models/tag_binarizer.joblib")
     joblib.dump(tfidf, "models/title_tfidf.joblib")
@@ -130,9 +164,10 @@ def preprocess_data(input_path, output_path):
 
 if __name__ == "__main__":
     RAW_DATA = "data/raw_jobs.csv"
-    PROCESSED_DATA = "data/processed_jobs.csv"
+    CLEANED_DATA = "data/cleaned_jobs.csv"
+    FEATURES_DATA = "data/features_jobs.csv"
     
     if os.path.exists(RAW_DATA):
-        preprocess_data(RAW_DATA, PROCESSED_DATA)
+        preprocess_data(RAW_DATA, CLEANED_DATA, FEATURES_DATA)
     else:
         print(f"Error: {RAW_DATA} not found!")
