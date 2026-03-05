@@ -1,0 +1,161 @@
+Loading processed data from data/processed_jobs.csv...
+Building Stacking Ensemble...
+Evaluating with 5-Fold Cross-Validation...
+Traceback (most recent call last):
+  File "D:\Dev\ML Project\code\src\train.py", line 125, in <module>
+    model, metrics = train_stacking_ensemble(X, y, cat_features, num_features)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\code\src\train.py", line 85, in train_stacking_ensemble
+    cv_results = cross_validate(
+                 ^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\_param_validation.py", line 218, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\model_selection\_validation.py", line 393, in cross_validate
+    _warn_or_raise_about_fit_failures(results, error_score)
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\model_selection\_validation.py", line 479, in _warn_or_raise_about_fit_failures
+    raise ValueError(all_fits_failed_message)
+ValueError: 
+All the 5 fits failed.
+It is very likely that your model is misconfigured.
+You can try to debug the error by setting error_score='raise'.
+
+Below are more details about the failures:
+--------------------------------------------------------------------------------
+4 fits failed with the following error:
+Traceback (most recent call last):
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\model_selection\_validation.py", line 833, in _fit_and_score
+    estimator.fit(X_train, y_train, **fit_params)
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_stacking.py", line 706, in fit
+    return super().fit(X, y_encoded, **fit_params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_stacking.py", line 211, in fit
+    self.estimators_ = Parallel(n_jobs=self.n_jobs)(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\parallel.py", line 1986, in __call__
+    return output if self.return_generator else list(output)
+                                                ^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\parallel.py", line 1914, in _get_sequential_output
+    res = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_base.py", line 45, in _fit_single_estimator
+    estimator.fit(X, y, **fit_params)
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 514, in fit
+    Xt, yt = self._fit(X, y, routed_params, raw_params=params)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 436, in _fit
+    X, y, fitted_transformer = fit_resample_one_cached(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\memory.py", line 326, in __call__
+    return self.func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 1332, in _fit_resample_one
+    X_res, y_res = sampler.fit_resample(X, y, **params.get("fit_resample", {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 204, in fit_resample
+    return super().fit_resample(X, y, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 101, in fit_resample
+    X, y, binarize_y = self._check_X_y(X, y)
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 159, in _check_X_y
+    X, y = validate_data(self, X=X, y=y, reset=True, accept_sparse=accept_sparse)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 2919, in validate_data
+    X, y = check_X_y(X, y, **check_params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 1314, in check_X_y
+    X = check_array(
+        ^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 1022, in check_array
+    array = _asarray_with_order(array, order=order, dtype=dtype, xp=xp)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\_array_api.py", line 878, in _asarray_with_order
+    array = numpy.asarray(array, order=order, dtype=dtype)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: "['software', 'system', 'python', 'engineer', 'linux']"
+
+--------------------------------------------------------------------------------
+1 fits failed with the following error:
+Traceback (most recent call last):
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\model_selection\_validation.py", line 833, in _fit_and_score
+    estimator.fit(X_train, y_train, **fit_params)
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_stacking.py", line 706, in fit
+    return super().fit(X, y_encoded, **fit_params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_stacking.py", line 211, in fit
+    self.estimators_ = Parallel(n_jobs=self.n_jobs)(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\parallel.py", line 1986, in __call__
+    return output if self.return_generator else list(output)
+                                                ^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\parallel.py", line 1914, in _get_sequential_output
+    res = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\ensemble\_base.py", line 45, in _fit_single_estimator
+    estimator.fit(X, y, **fit_params)
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 514, in fit
+    Xt, yt = self._fit(X, y, routed_params, raw_params=params)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 436, in _fit
+    X, y, fitted_transformer = fit_resample_one_cached(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\joblib\memory.py", line 326, in __call__
+    return self.func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\pipeline.py", line 1332, in _fit_resample_one
+    X_res, y_res = sampler.fit_resample(X, y, **params.get("fit_resample", {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 204, in fit_resample
+    return super().fit_resample(X, y, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\base.py", line 1336, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 101, in fit_resample
+    X, y, binarize_y = self._check_X_y(X, y)
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\imblearn\base.py", line 159, in _check_X_y
+    X, y = validate_data(self, X=X, y=y, reset=True, accept_sparse=accept_sparse)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 2919, in validate_data
+    X, y = check_X_y(X, y, **check_params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 1314, in check_X_y
+    X = check_array(
+        ^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\validation.py", line 1022, in check_array
+    array = _asarray_with_order(array, order=order, dtype=dtype, xp=xp)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\ML Project\.venv\Lib\site-packages\sklearn\utils\_array_api.py", line 878, in _asarray_with_order
+    array = numpy.asarray(array, order=order, dtype=dtype)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: "['software', 'system', 'security', 'python', '3d', 'training', 'game', 'gaming', 'docker', 'technical', 'code', 'java', 'operational', 'engineer']"
+
