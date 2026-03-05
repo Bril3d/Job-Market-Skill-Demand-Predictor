@@ -55,3 +55,5 @@ data/*.json
 # OS
 .DS_Store
 Thumbs.db
+
+guide_projet (1).pdf
