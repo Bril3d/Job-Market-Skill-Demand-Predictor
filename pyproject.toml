@@ -19,4 +19,7 @@ dependencies = [
     "setuptools>=69.1.1",
     "packaging>=23.2",
     "protobuf==4.25.3",
+    "fastapi>=0.135.1",
+    "uvicorn>=0.41.0",
+    "pydantic>=2.12.5",
 ]
