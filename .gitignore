@@ -67,3 +67,5 @@ node_modules/
 Thumbs.db
 
 guide_projet (1).pdf
+check_data.py
+diagnose_leakage.py
