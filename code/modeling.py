@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score, precision_recall_curve
 from xgboost import XGBClassifier
 from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.over_sampling import SMOTE
@@ -27,7 +27,8 @@ def load_data(path):
     df = df.dropna(subset=[target])
     y = df[target]
     cat_features = ["seniority", "category", "geo_tier"]
-    num_features = [c for c in df.columns if (c.startswith("tag_") and c != "tag_list") or c.startswith("title_tfidf_")]
+    # Added years_exp to num_features
+    num_features = ["years_exp"] + [c for c in df.columns if (c.startswith("tag_") and c != "tag_list") or c.startswith("title_tfidf_")]
     X = df[cat_features + num_features]
     return X, y, cat_features, num_features
 
@@ -60,11 +61,17 @@ def build_tuned_pipeline(cat_features, num_features, model_type="rf"):
     
     return pipeline, param_grid
 
+def get_best_threshold(y_true, y_probs):
+    precisions, recalls, thresholds = precision_recall_curve(y_true, y_probs)
+    f1_scores = (2 * precisions * recalls) / (precisions + recalls + 1e-8)
+    best_idx = np.argmax(f1_scores)
+    return thresholds[best_idx], f1_scores[best_idx]
+
 def train_and_track():
     X, y, cat_features, num_features = load_data("data/processed_jobs.csv")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
     
-    with mlflow.start_run(run_name="Stacking_Ensemble_Tuning"):
+    with mlflow.start_run(run_name="Stacking_Ensemble_Optimized"):
         print("Tuning Base Learners...")
         # 1. Tune Random Forest
         rf_pipe, rf_params = build_tuned_pipeline(cat_features, num_features, "rf")
@@ -80,30 +87,52 @@ def train_and_track():
         best_xgb = xgb_grid.best_estimator_
         mlflow.log_params({f"xgb_best_{k}": v for k, v in xgb_grid.best_params_.items()})
         
-        # 3. Build Stacking Ensemble with Tuned Models
+        # 3. Build Stacking Ensemble (Removed generic class_weight="balanced")
         print("Building Stacking Ensemble...")
         estimators = [("rf", best_rf), ("xgb", best_xgb)]
         stack_clf = StackingClassifier(
             estimators=estimators, 
-            final_estimator=LogisticRegression(class_weight="balanced"),
+            final_estimator=LogisticRegression(),
             cv=5
         )
         
         stack_clf.fit(X_train, y_train)
         
-        # 4. Evaluation
-        y_pred = stack_clf.predict(X_test)
-        f1 = f1_score(y_test, y_pred, average="macro")
-        roc_auc = roc_auc_score(y_test, stack_clf.predict_proba(X_test)[:, 1])
+        # 4. Threshold Optimization for Precision/Recall Balance
+        y_probs = stack_clf.predict_proba(X_test)[:, 1]
+        best_threshold, best_f1 = get_best_threshold(y_test, y_probs)
+        print(f"Optimal Threshold: {best_threshold:.4f} (Best F1: {best_f1:.4f})")
         
-        print(f"\nF1 (Macro): {f1:.4f}")
-        print(f"ROC-AUC: {roc_auc:.4f}")
+        y_pred = (y_probs >= best_threshold).astype(int)
+        
+        # 5. Metrics Calculation
+        target_names = ["Standard", "High Salary"]
+        report = classification_report(y_test, y_pred, target_names=target_names, output_dict=True)
+        roc_auc = roc_auc_score(y_test, y_probs)
+        
+        print("\nClassification Report (Optimized Threshold):")
+        print(classification_report(y_test, y_pred, target_names=target_names))
         
         # Log Metrics to MLflow
-        mlflow.log_metric("f1_macro", f1)
+        mlflow.log_param("best_threshold", best_threshold)
+        mlflow.log_metric("precision_high", report["High Salary"]["precision"])
+        mlflow.log_metric("recall_high", report["High Salary"]["recall"])
+        mlflow.log_metric("f1_macro", report["macro avg"]["f1-score"])
         mlflow.log_metric("roc_auc", roc_auc)
         
-        # Log Confusion Matrix as an artifact
+        # Log Performance to file for USER
+        metrics_summary = {
+            "accuracy": report["accuracy"],
+            "precision": report["High Salary"]["precision"],
+            "recall": report["High Salary"]["recall"],
+            "f1_macro": report["macro avg"]["f1-score"],
+            "roc_auc": roc_auc,
+            "best_threshold": float(best_threshold)
+        }
+        with open("data/evaluation_metrics.json", "w") as f:
+            json.dump(metrics_summary, f, indent=4)
+        
+        # Log Confusion Matrix
         cm = confusion_matrix(y_test, y_pred)
         cm_path = "data/confusion_matrix.json"
         with open(cm_path, "w") as f:
@@ -111,13 +140,16 @@ def train_and_track():
         mlflow.log_artifact(cm_path)
         
         # Log Model
-        mlflow.sklearn.log_model(stack_clf, "salary_model_stacking")
+        mlflow.sklearn.log_model(stack_clf, "salary_model_stacking_optimized")
         
         # Persistent save for app
         os.makedirs("models", exist_ok=True)
         joblib.dump(stack_clf, "models/salary_model.joblib")
+        # Save threshold too
+        with open("models/threshold.json", "w") as f:
+            json.dump({"threshold": float(best_threshold)}, f)
         
-        print("\nModel and metrics logged to MLflow successfully.")
+        print("\nOptimized model and metrics logged to MLflow successfully.")
         return stack_clf
 
 if __name__ == "__main__":

@@ -68,6 +68,18 @@ def map_geographic_tier(location):
         return "Tier 1"
     return "Tier 2"
 
+def extract_experience(title, tags):
+    """
+    Extracts years of experience if mentioned in title or tags.
+    Returns 0 if not found.
+    """
+    text = (str(title) + " " + str(tags)).lower()
+    # Look for "X+ years", "X years", "X-Y years"
+    matches = re.findall(r"(\d+)\s*\+?\s*years?", text)
+    if matches:
+        return max([int(m) for m in matches])
+    return 0
+
 def preprocess_data(input_path, output_path):
     print(f"Loading raw data from {input_path}...")
     df = pd.read_csv(input_path)
@@ -85,6 +97,7 @@ def preprocess_data(input_path, output_path):
     df["seniority"] = df["title"].apply(extract_seniority)
     df["category"] = df.apply(lambda row: map_category(row["title"], row["tags"]), axis=1)
     df["geo_tier"] = df["location"].apply(map_geographic_tier)
+    df["years_exp"] = df.apply(lambda row: extract_experience(row["title"], row["tags"]), axis=1)
     
     # 4. Handle Tags (Multi-Hot)
     print("Processing tags...")
@@ -93,11 +106,11 @@ def preprocess_data(input_path, output_path):
     tag_encoded = mlb.fit_transform(df["tag_list"])
     tag_df = pd.DataFrame(tag_encoded, columns=[f"tag_{c}" for c in mlb.classes_])
     
-    # 5. TF-IDF on Title
+    # 5. TF-IDF on Title (Increased features for precision)
     print("Extracting TF-IDF features from titles...")
-    tfidf = TfidfVectorizer(max_features=100, stop_words="english")
+    tfidf = TfidfVectorizer(max_features=200, stop_words="english")
     title_tfidf = tfidf.fit_transform(df["title"].fillna(""))
-    title_tfidf_df = pd.DataFrame(title_tfidf.toarray(), columns=[f"title_tfidf_{i}" for i in range(100)])
+    title_tfidf_df = pd.DataFrame(title_tfidf.toarray(), columns=[f"title_tfidf_{i}" for i in range(200)])
     
     # 6. Combine Features
     print("Combining features...")
