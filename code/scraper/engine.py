@@ -18,59 +18,71 @@ HEADERS = {
 }
 
 def fetch_remoteok_jobs_api():
-    """Fetches job listings from RemoteOK API and returns a pandas DataFrame."""
-    print(f"Fetching jobs from {API_URL}...")
-    try:
-        # Add a small delay to simulate human behavior
-        time.sleep(random.uniform(1.0, 3.0))
-        response = requests.get(API_URL, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
-        return pd.DataFrame()
+    """Fetches job listings from RemoteOK API across multiple tags and returns a pandas DataFrame."""
+    tags_to_scrape = ["python", "machine-learning", "data", "engineer", "react", "backend", "frontend", "devops"]
+    all_jobs_data = []
+    seen_job_ids = set()
 
-    try:
-        data = response.json()
-    except ValueError as e:
-        print(f"Error parsing JSON: {e}")
-        return pd.DataFrame()
-        
-    # The API usually returns a list of dictionaries. The first item is often a legal/info object.
-    if not data or not isinstance(data, list):
-        print("Unexpected data format from API.")
-        return pd.DataFrame()
-        
-    jobs_data = []
-    
-    # Skip the first element if it's the legal notice
-    start_idx = 1 if len(data) > 0 and data[0].get('legal') else 0
-    
-    for item in data[start_idx:]:
-        job_id = item.get('id', '')
-        company_name = item.get('company', '')
-        job_title = item.get('position', '')
-        salary = f"{item.get('salary_min', '')} - {item.get('salary_max', '')}" if item.get('salary_min') or item.get('salary_max') else ""
-        location_str = item.get('location', '')
-        tags = item.get('tags', [])
-        tags_str = ", ".join(tags) if isinstance(tags, list) else str(tags)
-        posted_date = item.get('date', '')
-        job_link = item.get('url', '')
+    for tag in tags_to_scrape:
+        tag_url = f"{API_URL}?tags={tag}"
+        print(f"Fetching jobs from {tag_url}...")
+        try:
+            # Add a small delay to simulate human behavior and avoid rate limits
+            time.sleep(random.uniform(2.0, 4.0))
+            response = requests.get(tag_url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching data for tag {tag}: {e}")
+            continue
 
-        if job_title and company_name:
-            jobs_data.append({
-                "job_id": job_id,
-                "company": company_name,
-                "title": job_title,
-                "salary": salary.strip(" -"),
-                "location": location_str,
-                "tags": tags_str,
-                "posted_date": posted_date,
-                "link": job_link
-            })
+        try:
+            data = response.json()
+        except ValueError as e:
+            print(f"Error parsing JSON for tag {tag}: {e}")
+            continue
             
-    print(f"Successfully extracted {len(jobs_data)} jobs from the API.")
+        if not data or not isinstance(data, list):
+            print(f"Unexpected data format from API for tag {tag}.")
+            continue
             
-    df = pd.DataFrame(jobs_data)
+        # Skip the first element if it's the legal notice
+        start_idx = 1 if len(data) > 0 and data[0].get('legal') else 0
+        
+        for item in data[start_idx:]:
+            job_id = str(item.get('id', ''))
+            
+            # De-duplicate
+            if not job_id or job_id in seen_job_ids:
+                continue
+                
+            seen_job_ids.add(job_id)
+
+            company_name = item.get('company', '')
+            job_title = item.get('position', '')
+            salary = f"{item.get('salary_min', '')} - {item.get('salary_max', '')}" if item.get('salary_min') or item.get('salary_max') else ""
+            location_str = item.get('location', '')
+            
+            item_tags = item.get('tags', [])
+            tags_str = ", ".join(item_tags) if isinstance(item_tags, list) else str(item_tags)
+            
+            posted_date = item.get('date', '')
+            job_link = item.get('url', '')
+
+            if job_title and company_name:
+                all_jobs_data.append({
+                    "job_id": job_id,
+                    "company": company_name,
+                    "title": job_title,
+                    "salary": salary.strip(" -"),
+                    "location": location_str,
+                    "tags": tags_str,
+                    "posted_date": posted_date,
+                    "link": job_link
+                })
+                
+    print(f"Successfully extracted {len(all_jobs_data)} unique jobs from the API.")
+            
+    df = pd.DataFrame(all_jobs_data)
     return df
 
 def save_jobs(df):
