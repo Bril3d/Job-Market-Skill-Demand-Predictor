@@ -23,7 +23,6 @@ def predict_demand(job_data, model_path="models/demand_model.joblib"):
 
     # Load artifacts
     model = joblib.load(model_path)
-    tag_binarizer = joblib.load("models/tag_binarizer.joblib")
     title_tfidf = joblib.load("models/title_tfidf.joblib")
     
     threshold = 0.5 # Default
@@ -31,15 +30,12 @@ def predict_demand(job_data, model_path="models/demand_model.joblib"):
         with open("models/threshold.json", "r") as f:
             threshold = json.load(f)["threshold"]
 
-    # 1. Process Tags
+    # 1. Process Tags - Removed binarized tags to prevent leakage
     tags = job_data.get("tags", [])
     if isinstance(tags, str):
         tags = [t.strip() for t in tags.split(",") if t.strip()]
     
     tags_str = ", ".join(tags)
-    tag_encoded = tag_binarizer.transform([tags])
-    tag_cols = [f"tag_{c}" for c in tag_binarizer.classes_]
-    tag_df = pd.DataFrame(tag_encoded, columns=tag_cols)
 
     # 2. Process Title
     title = job_data.get("title", "")
@@ -58,22 +54,20 @@ def predict_demand(job_data, model_path="models/demand_model.joblib"):
     has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
     has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
     has_frontend = check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"])
-    tag_frequency_score = min(num_skills / 10.0, 1.0) 
+    # NOTE: tag_frequency_score and num_skills were REMOVED - they caused target leakage
 
     input_df = pd.DataFrame([{
         "seniority": job_data.get("seniority", "Mid-Level"),
         "category": job_data.get("category", "Others"),
         "geo_tier": job_data.get("geo_tier", "Tier 2"),
         "years_exp": years_exp,
-        "num_skills": num_skills,
         "has_ai": has_ai,
         "has_cloud": has_cloud,
         "has_backend": has_backend,
-        "has_frontend": has_frontend,
-        "tag_frequency_score": tag_frequency_score
+        "has_frontend": has_frontend
     }])
     
-    final_input = pd.concat([input_df, tag_df, title_tfidf_df], axis=1)
+    final_input = pd.concat([input_df, title_tfidf_df], axis=1)
 
     # 4. Predict 
     probability = model.predict_proba(final_input)[0][1]

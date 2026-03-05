@@ -143,15 +143,13 @@ def get_prediction_history():
     return PREDICTION_HISTORY[-50:]
 
 def run_prediction(job_dict):
-    # 1. Process Tags
+    # 1. Process Tags - We no longer use raw binarized tags to prevent leakage
+    # we only use engineered summaries (has_ai, etc)
     tags = job_dict.get("tags", [])
     if isinstance(tags, str):
         tags = [t.strip() for t in tags.split(",") if t.strip()]
     
     tags_str = ", ".join(tags)
-    tag_encoded = TAG_BINARIZER.transform([tags])
-    tag_cols = [f"tag_{c}" for c in TAG_BINARIZER.classes_]
-    tag_df = pd.DataFrame(tag_encoded, columns=tag_cols)
 
     # 2. Process Title
     title = job_dict.get("title", "")
@@ -172,36 +170,27 @@ def run_prediction(job_dict):
     has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
     has_frontend = check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"])
 
-    # Load full feature set to get global stats for tag_frequency_score if needed, 
-    # but for inference we just use the model's logic.
-    # Actually, we need to replicate the demand_score calculation logic here or use a simplified heuristic.
-    # Specification says: "Compute demand based on skill/tag frequency."
-    # Since we don't want to load 30MB of CSV in every request, we'll use a pre-calculated mapping if we had one.
-    # For now, let's assume num_skills and keyword presence are the main drivers for the model.
-    # In a real system, tag_frequency_score would be a lookup.
-    # We'll set tag_frequency_score to 0 or num_skills/10 as a proxy if we don't have the global lookup.
-    tag_frequency_score = min(num_skills / 10.0, 1.0) 
+    # NOTE: tag_frequency_score and num_skills were REMOVED as they caused target leakage.
+    # The model was retrained without these features.
 
     input_df = pd.DataFrame([{
         "seniority": job_dict.get("seniority", "Mid-Level"),
         "category": job_dict.get("category", "Others"),
         "geo_tier": job_dict.get("geo_tier", "Tier 2"),
         "years_exp": years_exp,
-        "num_skills": num_skills,
         "has_ai": has_ai,
         "has_cloud": has_cloud,
         "has_backend": has_backend,
-        "has_frontend": has_frontend,
-        "tag_frequency_score": tag_frequency_score
+        "has_frontend": has_frontend
     }])
     
-    final_input = pd.concat([input_df, tag_df, title_tfidf_df], axis=1)
+    final_input = pd.concat([input_df, title_tfidf_df], axis=1)
 
     # 4. Predict
     probability = MODEL.predict_proba(final_input)[0][1]
     prediction = 1 if probability >= THRESHOLD else 0
     
-    return prediction, probability, years_exp, tag_frequency_score
+    return prediction, probability, years_exp
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_single(job: JobInput, api_key: str = Depends(verify_api_key)):
@@ -209,11 +198,11 @@ def predict_single(job: JobInput, api_key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        pred, prob, years_exp, demand_score = run_prediction(job.model_dump())
+        pred, prob, years_exp = run_prediction(job.model_dump())
         result = {
             "prediction": int(pred),
             "probability": float(prob),
-            "demand_score": float(demand_score),
+            "demand_score": float(prob),  # Use probability as demand indicator
             "threshold": float(THRESHOLD),
             "label": "High Demand Skillset" if pred == 1 else "Standard Demand Skillset",
             "experience_detected": years_exp
@@ -237,11 +226,11 @@ def predict_batch(jobs: List[JobInput], api_key: str = Depends(verify_api_key)):
     results = []
     for job in jobs:
         try:
-            pred, prob, years_exp, demand_score = run_prediction(job.model_dump())
+            pred, prob, years_exp = run_prediction(job.model_dump())
             results.append({
                 "prediction": int(pred),
                 "probability": float(prob),
-                "demand_score": float(demand_score),
+                "demand_score": float(prob),
                 "threshold": float(THRESHOLD),
                 "label": "High Demand Skillset" if pred == 1 else "Standard Demand Skillset",
                 "experience_detected": years_exp

@@ -102,15 +102,20 @@ def add_engineered_features(df):
     df["has_backend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"]))
     df["has_frontend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"]))
     
-    # tag_frequency_score is already demand_score_norm
-    df["tag_frequency_score"] = df["demand_score_norm"]
-    
     return df
 
 def preprocess_data(input_path, cleaned_path, features_path):
     print(f"Loading raw data from {input_path}...")
     df = pd.read_csv(input_path)
-    print(f"  Total jobs: {len(df)}")
+    print(f"  Total jobs loaded: {len(df)}")
+    
+    # 0. Remove duplicate job postings
+    dedup_cols = ["title", "tags"]
+    if "company" in df.columns:
+        dedup_cols = ["title", "company", "tags"]
+    before = len(df)
+    df = df.drop_duplicates(subset=dedup_cols).reset_index(drop=True)
+    print(f"  Duplicates removed: {before - len(df)} (remaining: {len(df)})")
     
     # 1. Domain Features (Basic Cleaning)
     print("\nExtracting domain features...")
@@ -146,9 +151,11 @@ def preprocess_data(input_path, cleaned_path, features_path):
     # 6. Combine Features
     print("Combining all features...")
     # Select original cols + engineered + encoded
+    # NOTE: demand_score, demand_score_norm, and tag_frequency_score are EXCLUDED
+    # to prevent target leakage (they are used to compute demand_label)
     core_cols = ["title", "seniority", "category", "geo_tier", "years_exp", "num_skills", 
                  "has_ai", "has_cloud", "has_backend", "has_frontend", 
-                 "tag_frequency_score", "demand_label"]
+                 "demand_label"]
     
     final_df = pd.concat([df[core_cols].reset_index(drop=True), tag_df, title_tfidf_df], axis=1)
     

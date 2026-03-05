@@ -26,18 +26,38 @@ def load_data(path):
     df = pd.read_csv(path)
     target = "demand_label"
     df = df.dropna(subset=[target])
+    
+    # Remove duplicates based on title column (tags are binarized)
+    before = len(df)
+    df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
+    print(f"  Duplicates removed: {before - len(df)} (remaining: {len(df)})")
+    
     y = df[target]
     
     cat_features = ["seniority", "category", "geo_tier"]
     
-    # Base numeric features
-    engineered_features = ["years_exp", "num_skills", "has_ai", "has_cloud", "has_backend", "has_frontend", "tag_frequency_score"]
+    # Base numeric features - NO demand_score or tag_frequency_score (target leakage)
+    # NOTE: num_skills removed - it's a proxy for demand_score (more tags = higher frequency sum)
+    engineered_features = ["years_exp", "has_ai", "has_cloud", "has_backend", "has_frontend"]
     
-    # Sparse features from tags and title TF-IDF
-    sparse_features = [c for c in df.columns if (c.startswith("tag_") and c not in ["tag_list", "tag_frequency_score"]) or c.startswith("title_tfidf_")]
+    # Sparse features - ONLY title TF-IDF (Tags removed to prevent leakage)
+    leaky_cols = {"tag_list", "tag_frequency_score", "demand_score", "demand_score_norm", "demand_label"}
+    sparse_features = [c for c in df.columns if c.startswith("title_tfidf_")]
     
     num_features = engineered_features + sparse_features
     X = df[cat_features + num_features]
+    
+    # VERIFICATION: Print feature columns to confirm no leakage
+    print(f"\n  === FEATURE VERIFICATION ===")
+    print(f"  Total features: {X.shape[1]}")
+    print(f"  Categorical: {cat_features}")
+    print(f"  Engineered: {engineered_features}")
+    print(f"  Sparse (tag+tfidf): {len(sparse_features)} columns")
+    # Confirm no leaky columns present
+    for col in X.columns:
+        assert col not in leaky_cols, f"LEAKAGE DETECTED: '{col}' is a target-derived feature!"
+    print(f"  No target leakage detected in feature matrix")
+    print(f"  ===========================\n")
     
     return X, y, cat_features, num_features
 
