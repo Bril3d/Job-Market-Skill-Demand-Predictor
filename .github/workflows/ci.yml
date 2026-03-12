@@ -26,14 +26,17 @@ jobs:
           mkdir -p models data
           # Mock TF-IDF with exactly 200 features
           uv run python -c "import joblib; from sklearn.feature_extraction.text import TfidfVectorizer; tfidf = TfidfVectorizer(max_features=200); tfidf.fit([' '.join([f'word_{i}' for i in range(200)])]); joblib.dump(tfidf, 'models/title_tfidf.joblib')"
-          # Mock Model with correct feature count
+          # Mock Model with correct feature count and both classes
           uv run python <<EOF
           import joblib; import pandas as pd; import numpy as np; from sklearn.ensemble import RandomForestClassifier; from sklearn.pipeline import Pipeline; from sklearn.compose import ColumnTransformer; from sklearn.preprocessing import OneHotEncoder;
           cols = ['seniority', 'category', 'geo_tier', 'years_exp', 'has_ai', 'has_cloud', 'has_backend', 'has_frontend'] + [f'title_tfidf_{i}' for i in range(200)]
-          df = pd.DataFrame([['Mid-Level', 'Others', 'Tier 2', 0, 0, 0, 0, 0] + [0.0]*200], columns=cols)
+          df = pd.DataFrame([
+              ['Mid-Level', 'Others', 'Tier 2', 0, 0, 0, 0, 0] + [0.0]*200,
+              ['Senior', 'ML Engineering', 'Tier 1', 5, 1, 1, 1, 1] + [1.0]*200
+          ], columns=cols)
           preprocessor = ColumnTransformer([('cat', OneHotEncoder(handle_unknown='ignore'), ['seniority', 'category', 'geo_tier'])], remainder='passthrough')
-          clf = Pipeline([('pre', preprocessor), ('clf', RandomForestClassifier(n_estimators=1))])
-          clf.fit(df, [1])
+          clf = Pipeline([('pre', preprocessor), ('clf', RandomForestClassifier(n_estimators=1, random_state=42))])
+          clf.fit(df, [0, 1])
           joblib.dump(clf, 'models/demand_model.joblib')
           EOF
           echo '{"threshold": 0.5}' > models/threshold.json
