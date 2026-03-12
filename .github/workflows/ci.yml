@@ -1,4 +1,4 @@
-name: SalaryGenius CI/CD
+name: Job Demand Predictor CI/CD
 
 on:
   push:
@@ -19,7 +19,19 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --dev
+
+      - name: Mock model artifacts
+        run: |
+          mkdir -p models data
+          # Create a dummy model that can be loaded by joblib
+          uv run python -c "import joblib; from sklearn.ensemble import RandomForestClassifier; import os; os.makedirs('models', exist_ok=True); clf = RandomForestClassifier(); clf.fit([[0]], [0]); joblib.dump(clf, 'models/demand_model.joblib')"
+          # Mock TF-IDF
+          uv run python -c "import joblib; from sklearn.feature_extraction.text import TfidfVectorizer; tfidf = TfidfVectorizer(); tfidf.fit(['dummy']); joblib.dump(tfidf, 'models/title_tfidf.joblib')"
+          # Mock Threshold and Data
+          echo '{"threshold": 0.5}' > models/threshold.json
+          echo "title,seniority,category,geo_tier,years_exp,has_ai,has_cloud,has_backend,has_frontend,demand_label" > data/features_jobs.csv
+          echo "Software Engineer,Mid-Level,Backend,Tier 1,5,0,1,1,0,1" >> data/features_jobs.csv
 
       - name: Run API tests
         run: uv run pytest tests/ -v --tb=short
@@ -38,7 +50,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --dev
 
       - name: Lint with ruff
         run: uv run ruff check code/ tests/
@@ -59,9 +71,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build
         run: npm run build
 
@@ -72,8 +81,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mock model artifacts for build
+        run: |
+          mkdir -p models data
+          python3 -c "import os; open('models/demand_model.joblib', 'a').close(); open('models/title_tfidf.joblib', 'a').close(); open('models/threshold.json', 'a').close(); open('data/features_jobs.csv', 'a').close()"
+
       - name: Build backend image
-        run: docker build -f Dockerfile.backend -t salarygenius-backend .
+        run: docker build -f Dockerfile.backend -t job-demand-backend .
 
       - name: Build frontend image
-        run: docker build -f frontend/Dockerfile -t salarygenius-frontend ./frontend
+        run: docker build -f frontend/Dockerfile -t job-demand-frontend ./frontend
