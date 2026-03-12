@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 const API_KEY = 'sg-dev-key-2026';
 
 const api = axios.create({
@@ -13,10 +13,10 @@ const api = axios.create({
 
 export const predictDemand = async (jobData) => {
   // Convert comma separated tags to array
-  const tags = typeof jobData.tags === 'string' 
-    ? jobData.tags.split(',').map(t => t.strip()).filter(t => t.length > 0)
+  const tags = typeof jobData.tags === 'string'
+    ? jobData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
     : jobData.tags;
-    
+
   const response = await api.post('/predict', { ...jobData, tags });
   return response.data;
 };

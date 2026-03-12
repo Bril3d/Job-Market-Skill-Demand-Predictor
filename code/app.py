@@ -198,6 +198,7 @@ def predict_single(job: JobInput, api_key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
+        logger.info(f"Received prediction request: {job}")
         pred, prob, years_exp = run_prediction(job.model_dump())
         result = {
             "prediction": int(pred),
