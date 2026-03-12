@@ -7,13 +7,13 @@ import joblib
 import json
 import mlflow
 import mlflow.sklearn
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score, precision_recall_curve
+from sklearn.metrics import classification_report, roc_auc_score, precision_recall_curve
 from xgboost import XGBClassifier
 from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.over_sampling import SMOTE
@@ -48,7 +48,7 @@ def load_data(path):
     X = df[cat_features + num_features]
     
     # VERIFICATION: Print feature columns to confirm no leakage
-    print(f"\n  === FEATURE VERIFICATION ===")
+    print("\n  === FEATURE VERIFICATION ===")
     print(f"  Total features: {X.shape[1]}")
     print(f"  Categorical: {cat_features}")
     print(f"  Engineered: {engineered_features}")
@@ -56,8 +56,8 @@ def load_data(path):
     # Confirm no leaky columns present
     for col in X.columns:
         assert col not in leaky_cols, f"LEAKAGE DETECTED: '{col}' is a target-derived feature!"
-    print(f"  No target leakage detected in feature matrix")
-    print(f"  ===========================\n")
+    print("  No target leakage detected in feature matrix")
+    print("  ===========================\n")
     
     return X, y, cat_features, num_features
 
@@ -175,7 +175,7 @@ def train_and_track():
         with open("data/evaluation_metrics.json", "w") as f:
             json.dump(metrics_summary, f, indent=4)
         
-        print(f"\nModel and metrics saved successfully to 'models/' and 'data/'")
+        print("\nModel and metrics saved successfully to 'models/' and 'data/'")
         return calibrated_clf
 
 if __name__ == "__main__":

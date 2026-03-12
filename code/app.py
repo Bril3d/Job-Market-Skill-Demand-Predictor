@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 import re
 
@@ -161,7 +161,6 @@ def run_prediction(job_dict):
     def check_keywords(tag_list, keywords):
         return 1 if any(kw in " ".join(tag_list).lower() for kw in keywords) else 0
 
-    num_skills = len(tags)
     has_ai = check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"])
     has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
     has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])

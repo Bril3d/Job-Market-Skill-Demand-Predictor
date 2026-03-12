@@ -37,6 +37,7 @@ jobs:
         run: uv run pytest tests/ -v --tb=short
         env:
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+          PYTHONPATH: .
 
   lint:
     runs-on: ubuntu-latest
@@ -54,6 +55,8 @@ jobs:
 
       - name: Lint with ruff
         run: uv run ruff check code/ tests/
+        env:
+          PYTHONPATH: .
 
   frontend:
     runs-on: ubuntu-latest

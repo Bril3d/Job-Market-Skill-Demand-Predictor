@@ -1,6 +1,5 @@
 import joblib
 import pandas as pd
-import numpy as np
 import os
 import re
 import json
@@ -49,7 +48,6 @@ def predict_demand(job_data, model_path="models/demand_model.joblib"):
     def check_keywords(tag_list, keywords):
         return 1 if any(kw in " ".join(tag_list).lower() for kw in keywords) else 0
 
-    num_skills = len(tags)
     has_ai = check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"])
     has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
     has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
