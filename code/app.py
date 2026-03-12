@@ -32,22 +32,6 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
         raise HTTPException(status_code=403, detail="Invalid API Key")
     return api_key
 
-# Initialize FastAPI
-app = FastAPI(
-    title="Skill Demand Predictor API",
-    description="Predicts job market skill demand using ensemble ML models",
-    version="3.0.0",
-    lifespan=lifespan
-)
-
-# Enable CORS for React frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Global variables for model artifacts
 MODEL = None
 TITLE_TFIDF = None
@@ -60,13 +44,6 @@ def extract_experience(title, tags):
     if matches:
         return max([int(m) for m in matches])
     return 0
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Load model artifacts on start
-    print(f"DEBUG: Starting lifespan. MODEL_PATH={MODEL_PATH}")
-    load_artifacts()
-    yield
 
 def load_artifacts():
     global MODEL, TITLE_TFIDF, THRESHOLD
@@ -87,6 +64,21 @@ def load_artifacts():
     except Exception as e:
         logger.error(f"Error loading artifacts: {e}")
         print(f"DEBUG: EXCEPTION during load_artifacts: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load model artifacts on start
+    print(f"DEBUG: Starting lifespan. MODEL_PATH={MODEL_PATH}")
+    load_artifacts()
+    yield
+
+# Initialize FastAPI
+app = FastAPI(
+    title="Skill Demand Predictor API",
+    description="Predicts job market skill demand using ensemble ML models",
+    version="3.0.0",
+    lifespan=lifespan
+)
 
 # Request / Response Models
 class JobInput(BaseModel):
