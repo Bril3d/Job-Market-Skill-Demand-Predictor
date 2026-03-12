@@ -25,19 +25,19 @@ jobs:
         run: |
           mkdir -p models data
           # Mock TF-IDF with exactly 200 features
-          uv run python -c "import joblib; from sklearn.feature_extraction.text import TfidfVectorizer; tfidf = TfidfVectorizer(max_features=200); tfidf.fit(['dummy ' * 200]); joblib.dump(tfidf, 'models/title_tfidf.joblib')"
+          uv run python -c "import joblib; from sklearn.feature_extraction.text import TfidfVectorizer; tfidf = TfidfVectorizer(max_features=200); tfidf.fit([' '.join([f'word_{i}' for i in range(200)])]); joblib.dump(tfidf, 'models/title_tfidf.joblib')"
           # Mock Model with correct feature count
           uv run python <<EOF
           import joblib; import pandas as pd; import numpy as np; from sklearn.ensemble import RandomForestClassifier; from sklearn.pipeline import Pipeline; from sklearn.compose import ColumnTransformer; from sklearn.preprocessing import OneHotEncoder;
-          df = pd.DataFrame([['Mid-Level', 'Others', 'Tier 2', 0, 0, 0, 0, 0] + [0.0]*200], columns=['seniority', 'category', 'geo_tier', 'years_exp', 'has_ai', 'has_cloud', 'has_backend', 'has_frontend'] + [f'title_tfidf_{i}' for i in range(200)]);
-          preprocessor = ColumnTransformer([('cat', OneHotEncoder(handle_unknown='ignore'), ['seniority', 'category', 'geo_tier'])], remainder='passthrough');
-          clf = Pipeline([('pre', preprocessor), ('clf', RandomForestClassifier(n_estimators=1))]);
-          clf.fit(df, [1]);
+          cols = ['seniority', 'category', 'geo_tier', 'years_exp', 'has_ai', 'has_cloud', 'has_backend', 'has_frontend'] + [f'title_tfidf_{i}' for i in range(200)]
+          df = pd.DataFrame([['Mid-Level', 'Others', 'Tier 2', 0, 0, 0, 0, 0] + [0.0]*200], columns=cols)
+          preprocessor = ColumnTransformer([('cat', OneHotEncoder(handle_unknown='ignore'), ['seniority', 'category', 'geo_tier'])], remainder='passthrough')
+          clf = Pipeline([('pre', preprocessor), ('clf', RandomForestClassifier(n_estimators=1))])
+          clf.fit(df, [1])
           joblib.dump(clf, 'models/demand_model.joblib')
           EOF
           echo '{"threshold": 0.5}' > models/threshold.json
-          echo "accuracy,precision,recall,f1_high,roc_auc,best_threshold" > data/evaluation_metrics.json
-          echo "0.9,0.9,0.9,0.9,0.9,0.5" >> data/evaluation_metrics.json
+          echo '{"accuracy": 0.9, "precision": 0.9, "recall": 0.9, "f1_high": 0.9, "roc_auc": 0.9, "best_threshold": 0.5}' > data/evaluation_metrics.json
           echo "title,seniority,category,geo_tier,years_exp,has_ai,has_cloud,has_backend,has_frontend,demand_label" > data/features_jobs.csv
 
       - name: Run API tests

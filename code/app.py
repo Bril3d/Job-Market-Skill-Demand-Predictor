@@ -80,6 +80,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Enable CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Request / Response Models
 class JobInput(BaseModel):
     title: str
