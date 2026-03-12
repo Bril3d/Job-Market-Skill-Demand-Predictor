@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
+from contextlib import asynccontextmanager
 import re
 
 # Configure logging
@@ -33,9 +34,10 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
 
 # Initialize FastAPI
 app = FastAPI(
-    title="SkillDemand AI API",
-    description="AI-powered job skill demand prediction engine",
-    version="3.0.0"
+    title="Skill Demand Predictor API",
+    description="Predicts job market skill demand using ensemble ML models",
+    version="3.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS for React frontend
@@ -59,21 +61,32 @@ def extract_experience(title, tags):
         return max([int(m) for m in matches])
     return 0
 
-@app.on_event("startup")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load model artifacts on start
+    print(f"DEBUG: Starting lifespan. MODEL_PATH={MODEL_PATH}")
+    load_artifacts()
+    yield
+
 def load_artifacts():
-    global MODEL, TAG_BINARIZER, TITLE_TFIDF, THRESHOLD
+    global MODEL, TITLE_TFIDF, THRESHOLD
+    print(f"DEBUG: Attempting to load artifacts. Checking {MODEL_PATH}")
     try:
         if os.path.exists(MODEL_PATH):
+            print(f"DEBUG: File exists: {MODEL_PATH}")
             MODEL = joblib.load(MODEL_PATH)
             TITLE_TFIDF = joblib.load(TFIDF_PATH)
             if os.path.exists(THRESHOLD_PATH):
                 with open(THRESHOLD_PATH, "r") as f:
                     THRESHOLD = json.load(f)["threshold"]
             logger.info(f"Model artifacts loaded successfully from {MODEL_PATH}")
+            print("DEBUG: Artifacts loaded successfully")
         else:
             logger.warning(f"Model not found at {MODEL_PATH}. Prediction endpoints will fail.")
+            print(f"DEBUG: Model file NOT FOUND at {MODEL_PATH}")
     except Exception as e:
         logger.error(f"Error loading artifacts: {e}")
+        print(f"DEBUG: EXCEPTION during load_artifacts: {e}")
 
 # Request / Response Models
 class JobInput(BaseModel):
