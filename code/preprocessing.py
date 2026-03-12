@@ -3,7 +3,6 @@ import numpy as np
 import re
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MultiLabelBinarizer
 import joblib
 
 def extract_seniority(title):
@@ -134,13 +133,7 @@ def preprocess_data(input_path, cleaned_path, features_path):
     # 3. Feature Engineering
     df = add_engineered_features(df)
     
-    # 4. Handle Tags (Multi-Hot)
-    print("Processing tags for ML...")
-    mlb = MultiLabelBinarizer()
-    tag_encoded = mlb.fit_transform(df["tag_list"])
-    tag_df = pd.DataFrame(tag_encoded, columns=[f"tag_{c}" for c in mlb.classes_])
-    
-    # 5. TF-IDF on Title
+    # 4. TF-IDF on Title
     print("Extracting TF-IDF features from titles...")
     n_features = min(200, len(df))
     tfidf = TfidfVectorizer(max_features=n_features, stop_words="english")
@@ -157,7 +150,7 @@ def preprocess_data(input_path, cleaned_path, features_path):
                  "has_ai", "has_cloud", "has_backend", "has_frontend", 
                  "demand_label"]
     
-    final_df = pd.concat([df[core_cols].reset_index(drop=True), tag_df, title_tfidf_df], axis=1)
+    final_df = pd.concat([df[core_cols].reset_index(drop=True), title_tfidf_df], axis=1)
     
     final_df.to_csv(features_path, index=False)
     print(f"\nFinal features dataset saved to {features_path}")
@@ -165,7 +158,6 @@ def preprocess_data(input_path, cleaned_path, features_path):
     
     # Store the preprocessing artifacts
     os.makedirs("models", exist_ok=True)
-    joblib.dump(mlb, "models/tag_binarizer.joblib")
     joblib.dump(tfidf, "models/title_tfidf.joblib")
     print("Preprocessing artifacts saved to 'models/'")
 

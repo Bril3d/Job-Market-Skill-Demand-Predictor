@@ -17,7 +17,6 @@ logger = logging.getLogger("SkillDemand")
 
 # Environment configuration
 MODEL_PATH = os.getenv("MODEL_PATH", "models/demand_model.joblib")
-TAG_BINARIZER_PATH = os.getenv("TAG_BINARIZER_PATH", "models/tag_binarizer.joblib")
 TFIDF_PATH = os.getenv("TFIDF_PATH", "models/title_tfidf.joblib")
 THRESHOLD_PATH = os.getenv("THRESHOLD_PATH", "models/threshold.json")
 METRICS_PATH = os.getenv("METRICS_PATH", "data/evaluation_metrics.json")
@@ -49,7 +48,6 @@ app.add_middleware(
 
 # Global variables for model artifacts
 MODEL = None
-TAG_BINARIZER = None
 TITLE_TFIDF = None
 THRESHOLD = 0.5
 PREDICTION_HISTORY = []
@@ -67,7 +65,6 @@ def load_artifacts():
     try:
         if os.path.exists(MODEL_PATH):
             MODEL = joblib.load(MODEL_PATH)
-            TAG_BINARIZER = joblib.load(TAG_BINARIZER_PATH)
             TITLE_TFIDF = joblib.load(TFIDF_PATH)
             if os.path.exists(THRESHOLD_PATH):
                 with open(THRESHOLD_PATH, "r") as f:
