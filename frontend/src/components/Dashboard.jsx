@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getInsights, getMetrics } from '../services/api';
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, Tooltip, 
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
   RadarChart, PolarGrid, PolarAngleAxis, Radar,
   Legend
 } from 'recharts';
@@ -41,7 +41,7 @@ const Dashboard = ({ darkMode }) => {
     { subject: 'ROC AUC', A: (metrics.roc_auc * 100), fullMark: 100 },
   ];
 
-  const COLORS = ['#3b82f6', '#1f2937'];
+  const COLORS = ['#3b82f6', '#53585eff'];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

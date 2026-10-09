@@ -28,18 +28,26 @@ share/python-wheels/
 MANIFEST
 
 # Environment
-.venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+.env.local
+.env.*.local
 
 # IDE / Editor
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Tests and Linters
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Data
 data/raw/
@@ -53,19 +61,26 @@ data/*.json
 
 # ML Artifacts
 mlruns/
-models/*.joblib
+models/
 
-# Logs
+# Logs, Debug & Scratch Scripts
 *.log
 *.txt
+debug_*.py
+take_screenshots.js
+frontend/take_screenshots.js
 
-# Node
+# Node & Frontend Build
 node_modules/
+frontend/node_modules/
+frontend/dist/
+.eslintcache
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Temporary project scripts & documents
 guide_projet (1).pdf
 check_data.py
 diagnose_leakage.py

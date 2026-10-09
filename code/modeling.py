@@ -19,6 +19,7 @@ from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.over_sampling import SMOTE
 
 # Configure MLflow
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
 mlflow.set_experiment("Skill_Demand_Prediction_Experiment")
 
 def load_data(path):
@@ -102,10 +103,19 @@ def train_and_track():
         print(f"Error: {FEATURES_PATH} not found. Run preprocessing first.")
         return
 
+    # Enable autologging for richer 'Overview' and 'Models' tabs
+    mlflow.sklearn.autolog(log_datasets=True)
+    
     X, y, cat_features, num_features = load_data(FEATURES_PATH)
+    
+    # Explicitly log dataset to populate the 'Datasets' tab
+    # We join X and y so MLflow can track the full feature+target schema
+    dataset = mlflow.data.from_pandas(X.assign(demand_label=y), targets="demand_label", name="JobFeatures", source=FEATURES_PATH)
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
     
     with mlflow.start_run(run_name="Demand_Stacking_Ensemble"):
+        mlflow.log_input(dataset, context="training")
         print("Tuning Base Learners...")
         
         # 1. Random Forest
