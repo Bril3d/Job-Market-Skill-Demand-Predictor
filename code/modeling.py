@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import mlflow
 import mlflow.sklearn
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_predict, GridSearchCV
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_predict
 from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.dummy import DummyClassifier
@@ -15,7 +15,6 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (
-    classification_report,
     confusion_matrix,
     roc_auc_score,
     precision_recall_curve,
@@ -64,12 +63,12 @@ def load_data(path="data/features_jobs.csv"):
     for col in X.columns:
         assert col not in leaky_cols, f"LEAKAGE DETECTED: Column '{col}' is target-derived or circular!"
         
-    print(f"\n  === FEATURE VERIFICATION ===")
+    print("\n  === FEATURE VERIFICATION ===")
     print(f"  Total samples: {len(X)}")
     print(f"  Class balance: High Demand = {(y == 1).sum()} ({(y == 1).mean():.1%}), Low Demand = {(y == 0).sum()} ({(y == 0).mean():.1%})")
     print(f"  Input features: {list(X.columns)}")
-    print(f"  Zero target leakage confirmed in feature matrix.")
-    print(f"  =============================\n")
+    print("  Zero target leakage confirmed in feature matrix.")
+    print("  =============================\n")
     
     return X, y
 
@@ -110,8 +109,6 @@ def evaluate_and_compare_models(X_train, y_train, X_test, y_test):
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
     # 1. Base model configurations
-    preprocessor = build_preprocessor()
-    
     candidate_pipes = {
         "Dummy (Most Frequent)": DummyClassifier(strategy="most_frequent"),
         "Dummy (Stratified)": DummyClassifier(strategy="stratified", random_state=42),
@@ -259,7 +256,7 @@ def train_and_track():
     
     print("\n" + "=" * 80)
     print(f"BEST MODEL SELECTED: {best_model_name}")
-    print(f"Justification: Optimal bias-variance trade-off on sparse 200-dim TF-IDF space.")
+    print("Justification: Optimal bias-variance trade-off on sparse 200-dim TF-IDF space.")
     print(f"Test Accuracy: {best_metrics['test_accuracy_tuned']:.4f}, F1: {best_metrics['test_f1_tuned']:.4f}, ROC-AUC: {best_metrics['test_roc_auc']:.4f}")
     print("=" * 80)
     

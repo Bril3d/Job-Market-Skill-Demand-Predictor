@@ -24,24 +24,56 @@ jobs:
       - name: Mock model artifacts
         run: |
           mkdir -p models data
-          # Mock TF-IDF with exactly 200 features
-          uv run python -c "import joblib; from sklearn.feature_extraction.text import TfidfVectorizer; tfidf = TfidfVectorizer(max_features=200); tfidf.fit([' '.join([f'word_{i}' for i in range(200)])]); joblib.dump(tfidf, 'models/title_tfidf.joblib')"
-          # Mock Model with correct feature count and both classes
-          uv run python <<EOF
-          import joblib; import pandas as pd; import numpy as np; from sklearn.ensemble import RandomForestClassifier; from sklearn.pipeline import Pipeline; from sklearn.compose import ColumnTransformer; from sklearn.preprocessing import OneHotEncoder;
-          cols = ['seniority', 'category', 'geo_tier', 'years_exp', 'has_ai', 'has_cloud', 'has_backend', 'has_frontend'] + [f'title_tfidf_{i}' for i in range(200)]
-          df = pd.DataFrame([
-              ['Mid-Level', 'Others', 'Tier 2', 0, 0, 0, 0, 0] + [0.0]*200,
-              ['Senior', 'ML Engineering', 'Tier 1', 5, 1, 1, 1, 1] + [1.0]*200
-          ], columns=cols)
-          preprocessor = ColumnTransformer([('cat', OneHotEncoder(handle_unknown='ignore'), ['seniority', 'category', 'geo_tier'])], remainder='passthrough')
-          clf = Pipeline([('pre', preprocessor), ('clf', RandomForestClassifier(n_estimators=1, random_state=42))])
-          clf.fit(df, [0, 1])
-          joblib.dump(clf, 'models/demand_model.joblib')
-          EOF
-          echo '{"threshold": 0.5}' > models/threshold.json
-          echo '{"accuracy": 0.9, "precision": 0.9, "recall": 0.9, "f1_high": 0.9, "roc_auc": 0.9, "best_threshold": 0.5}' > data/evaluation_metrics.json
-          echo "title,seniority,category,geo_tier,years_exp,has_ai,has_cloud,has_backend,has_frontend,demand_label" > data/features_jobs.csv
+          uv run python -c "
+          import joblib, json, pandas as pd
+          from sklearn.linear_model import LogisticRegression
+          from sklearn.pipeline import Pipeline
+          from sklearn.compose import ColumnTransformer
+          from sklearn.preprocessing import OneHotEncoder
+          from sklearn.feature_extraction.text import TfidfVectorizer
+
+          prep = ColumnTransformer([
+              ('title_tfidf', TfidfVectorizer(max_features=200, stop_words='english'), 'title'),
+              ('cat', OneHotEncoder(handle_unknown='ignore'), ['seniority', 'category', 'geo_tier']),
+              ('num', 'passthrough', ['years_exp'])
+          ], remainder='drop')
+
+          data = [{
+              'title': f'Job Title {i} Engineer',
+              'seniority': 'Senior' if i % 2 == 0 else 'Junior',
+              'category': 'ML Engineering' if i % 2 == 0 else 'Others',
+              'geo_tier': 'Tier 1' if i % 2 == 0 else 'Tier 2',
+              'years_exp': i % 10,
+              'demand_label': 1 if i % 2 == 0 else 0
+          } for i in range(100)]
+          df = pd.DataFrame(data)
+          df.to_csv('data/features_jobs.csv', index=False)
+
+          model = Pipeline([('preprocessor', prep), ('classifier', LogisticRegression(random_state=42))])
+          model.fit(df[['title', 'seniority', 'category', 'geo_tier', 'years_exp']], df['demand_label'])
+
+          joblib.dump(model, 'models/demand_model.joblib')
+          joblib.dump(model.named_steps['preprocessor'].named_transformers_['title_tfidf'], 'models/title_tfidf.joblib')
+
+          with open('models/threshold.json', 'w') as f:
+              json.dump({'threshold': 0.5181}, f)
+
+          metrics = {
+              'model_name': 'Logistic Regression',
+              'accuracy': 0.8462,
+              'precision': 0.8824,
+              'recall': 0.8182,
+              'f1_high': 0.8491,
+              'macro_f1': 0.8461,
+              'roc_auc': 0.9373,
+              'best_threshold': 0.5181,
+              'confusion_matrix': [[43, 6], [10, 45]],
+              'leakage_free': True,
+              'threshold_selection': 'training_cv_only'
+          }
+          with open('data/evaluation_metrics.json', 'w') as f:
+              json.dump(metrics, f, indent=4)
+          "
 
       - name: Run API tests
         run: uv run pytest tests/ -v --tb=short
