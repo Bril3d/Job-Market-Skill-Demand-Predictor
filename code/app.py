@@ -38,7 +38,7 @@ TITLE_TFIDF = None
 THRESHOLD = 0.5
 PREDICTION_HISTORY = []
 
-def extract_experience(title, tags):
+def extract_experience(title, tags=""):
     text = (str(title) + " " + str(tags)).lower()
     matches = re.findall(r"(\d+)\s*\+?\s*years?", text)
     if matches:
@@ -52,7 +52,8 @@ def load_artifacts():
         if os.path.exists(MODEL_PATH):
             print(f"DEBUG: File exists: {MODEL_PATH}")
             MODEL = joblib.load(MODEL_PATH)
-            TITLE_TFIDF = joblib.load(TFIDF_PATH)
+            if os.path.exists(TFIDF_PATH):
+                TITLE_TFIDF = joblib.load(TFIDF_PATH)
             if os.path.exists(THRESHOLD_PATH):
                 with open(THRESHOLD_PATH, "r") as f:
                     THRESHOLD = json.load(f)["threshold"]
@@ -153,50 +154,27 @@ def get_prediction_history():
     return PREDICTION_HISTORY[-50:]
 
 def run_prediction(job_dict):
-    # 1. Process Tags - We no longer use raw binarized tags to prevent leakage
-    # we only use engineered summaries (has_ai, etc)
+    # Process Tags for optional experience extraction (no circular shortcut features used)
     tags = job_dict.get("tags", [])
-    if isinstance(tags, str):
-        tags = [t.strip() for t in tags.split(",") if t.strip()]
-    
-    tags_str = ", ".join(tags)
+    if isinstance(tags, list):
+        tags_str = ", ".join(tags)
+    else:
+        tags_str = str(tags)
 
-    # 2. Process Title
-    title = job_dict.get("title", "")
-    title_encoded = TITLE_TFIDF.transform([title])
-    n_tfidf = len(TITLE_TFIDF.get_feature_names_out())
-    title_tfidf_df = pd.DataFrame(title_encoded.toarray(), columns=[f"title_tfidf_{i}" for i in range(n_tfidf)])
-
-    # 3. Engineered Features
+    title = str(job_dict.get("title", "")).strip()
     years_exp = extract_experience(title, tags_str)
-    
-    # helper for keyword groups
-    def check_keywords(tag_list, keywords):
-        return 1 if any(kw in " ".join(tag_list).lower() for kw in keywords) else 0
 
-    has_ai = check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"])
-    has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
-    has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
-    has_frontend = check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"])
-
-    # NOTE: tag_frequency_score and num_skills were REMOVED as they caused target leakage.
-    # The model was retrained without these features.
-
+    # Input DataFrame matches the pipeline feature schema (title, seniority, category, geo_tier, years_exp)
     input_df = pd.DataFrame([{
+        "title": title,
         "seniority": job_dict.get("seniority", "Mid-Level"),
         "category": job_dict.get("category", "Others"),
         "geo_tier": job_dict.get("geo_tier", "Tier 2"),
-        "years_exp": years_exp,
-        "has_ai": has_ai,
-        "has_cloud": has_cloud,
-        "has_backend": has_backend,
-        "has_frontend": has_frontend
+        "years_exp": years_exp
     }])
-    
-    final_input = pd.concat([input_df, title_tfidf_df], axis=1)
 
-    # 4. Predict
-    probability = MODEL.predict_proba(final_input)[0][1]
+    # Predict via end-to-end pipeline (ColumnTransformer handles text TF-IDF internally)
+    probability = float(MODEL.predict_proba(input_df)[0][1])
     prediction = 1 if probability >= THRESHOLD else 0
     
     return prediction, probability, years_exp

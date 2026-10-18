@@ -4,7 +4,7 @@ import os
 import re
 import json
 
-def extract_experience(title, tags):
+def extract_experience(title, tags=""):
     text = (str(title) + " " + str(tags)).lower()
     matches = re.findall(r"(\d+)\s*\+?\s*years?", text)
     if matches:
@@ -20,55 +20,34 @@ def predict_demand(job_data, model_path="models/demand_model.joblib"):
         print(f"Error: Model not found at {model_path}")
         return None
 
-    # Load artifacts
+    # Load end-to-end pipeline model
     model = joblib.load(model_path)
-    title_tfidf = joblib.load("models/title_tfidf.joblib")
     
-    threshold = 0.5 # Default
+    threshold = 0.5  # Default
     if os.path.exists("models/threshold.json"):
         with open("models/threshold.json", "r") as f:
-            threshold = json.load(f)["threshold"]
+            threshold = json.load(f).get("threshold", 0.5)
 
-    # 1. Process Tags - Removed binarized tags to prevent leakage
+    title = str(job_data.get("title", "")).strip()
     tags = job_data.get("tags", [])
-    if isinstance(tags, str):
-        tags = [t.strip() for t in tags.split(",") if t.strip()]
-    
-    tags_str = ", ".join(tags)
-
-    # 2. Process Title
-    title = job_data.get("title", "")
-    title_encoded = title_tfidf.transform([title])
-    n_tfidf = len(title_tfidf.get_feature_names_out())
-    title_tfidf_df = pd.DataFrame(title_encoded.toarray(), columns=[f"title_tfidf_{i}" for i in range(n_tfidf)])
-
-    # 3. Engineered Features
+    if isinstance(tags, list):
+        tags_str = ", ".join(tags)
+    else:
+        tags_str = str(tags)
+        
     years_exp = extract_experience(title, tags_str)
-    
-    def check_keywords(tag_list, keywords):
-        return 1 if any(kw in " ".join(tag_list).lower() for kw in keywords) else 0
 
-    has_ai = check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"])
-    has_cloud = check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"])
-    has_backend = check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"])
-    has_frontend = check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"])
-    # NOTE: tag_frequency_score and num_skills were REMOVED - they caused target leakage
-
+    # Input DataFrame matches the pipeline feature schema (no circular tag features)
     input_df = pd.DataFrame([{
+        "title": title,
         "seniority": job_data.get("seniority", "Mid-Level"),
         "category": job_data.get("category", "Others"),
         "geo_tier": job_data.get("geo_tier", "Tier 2"),
-        "years_exp": years_exp,
-        "has_ai": has_ai,
-        "has_cloud": has_cloud,
-        "has_backend": has_backend,
-        "has_frontend": has_frontend
+        "years_exp": years_exp
     }])
-    
-    final_input = pd.concat([input_df, title_tfidf_df], axis=1)
 
-    # 4. Predict 
-    probability = model.predict_proba(final_input)[0][1]
+    # Predict via end-to-end pipeline (ColumnTransformer handles text TF-IDF internally)
+    probability = float(model.predict_proba(input_df)[0][1])
     prediction = 1 if probability >= threshold else 0
 
     return prediction, probability, threshold
@@ -101,3 +80,4 @@ if __name__ == "__main__":
         print(f"Confidence: {prob:.2%}")
         print(f"Threshold Used: {thresh:.4f}")
         print("-" * 30)
+

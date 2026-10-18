@@ -1,8 +1,6 @@
 import pandas as pd
 import re
 import os
-from sklearn.feature_extraction.text import TfidfVectorizer
-import joblib
 
 def extract_seniority(title):
     title = str(title).lower()
@@ -14,7 +12,8 @@ def extract_seniority(title):
         return "Senior"
     return "Mid-Level"
 
-def map_category(title, tags):
+def map_category(title, tags=""):
+    # Primary classification driven by title, supplemented by tags if needed
     text = (str(title) + " " + str(tags)).lower()
     if any(word in text for word in ["data scientist", "data science", "scientist"]):
         return "Data Science"
@@ -39,7 +38,7 @@ def map_geographic_tier(location):
         return "Tier 1"
     return "Tier 2"
 
-def extract_experience(title, tags):
+def extract_experience(title, tags=""):
     """
     Extracts years of experience if mentioned in title or tags.
     Returns 0 if not found.
@@ -53,6 +52,12 @@ def extract_experience(title, tags):
 def compute_demand_features(df):
     """
     Computes demand_score and demand_label based on tag frequency.
+    
+    LIMITATION NOTE (Target Definition Validity):
+    demand_score is computed as the sum of tag frequencies in the scraped corpus.
+    This creates an inherent volume bias (jobs with more tags receive higher scores,
+    with correlation ~0.915). To prevent circular target reconstruction, input features
+    must NOT include tag counts (num_skills) or tag-based keyword flags (e.g. has_cloud).
     """
     print("\nComputing Demand Features...")
     
@@ -84,33 +89,14 @@ def compute_demand_features(df):
     
     return df
 
-def add_engineered_features(df):
-    """
-    Adds binary features based on keyword groups in tags.
-    """
-    print("Adding engineered features...")
-    
-    # Helper to check keywords in tag list
-    def check_keywords(tag_list, keywords):
-        return 1 if any(kw in " ".join(tag_list) for kw in keywords) else 0
-
-    df["num_skills"] = df["tag_list"].apply(len)
-    df["has_ai"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["ai", "machine learning", "pytorch", "tensorflow", "nlp", "vision"]))
-    df["has_cloud"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["aws", "azure", "gcp", "cloud", "docker", "kubernetes"]))
-    df["has_backend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["backend", "python", "java", "django", "fastapi", "node", "api"]))
-    df["has_frontend"] = df["tag_list"].apply(lambda tags: check_keywords(tags, ["frontend", "react", "vue", "angular", "javascript", "typescript", "ui", "ux"]))
-    
-    return df
-
 def preprocess_data(input_path, cleaned_path, features_path):
     print(f"Loading raw data from {input_path}...")
     df = pd.read_csv(input_path)
     print(f"  Total jobs loaded: {len(df)}")
     
-    # 0. Remove duplicate job postings
-    dedup_cols = ["title", "tags"]
-    if "company" in df.columns:
-        dedup_cols = ["title", "company", "tags"]
+    # 0. Initial deduplication
+    dedup_cols = ["title", "company", "tags"]
+    dedup_cols = [c for c in dedup_cols if c in df.columns]
     before = len(df)
     df = df.drop_duplicates(subset=dedup_cols).reset_index(drop=True)
     print(f"  Duplicates removed: {before - len(df)} (remaining: {len(df)})")
@@ -129,36 +115,26 @@ def preprocess_data(input_path, cleaned_path, features_path):
     # 2. Demand Target Generation
     df = compute_demand_features(df)
     
-    # 3. Feature Engineering
-    df = add_engineered_features(df)
+    # 3. Deduplication by Title
+    # To prevent identical job postings from appearing across train and test splits,
+    # deduplicate by title.
+    before_title_dedup = len(df)
+    df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
+    print(f"  Title deduplication: removed {before_title_dedup - len(df)} duplicate titles (final: {len(df)})")
     
-    # 4. TF-IDF on Title
-    print("Extracting TF-IDF features from titles...")
-    n_features = min(200, len(df))
-    tfidf = TfidfVectorizer(max_features=n_features, stop_words="english")
-    title_tfidf = tfidf.fit_transform(df["title"].fillna(""))
-    actual_features = title_tfidf.shape[1]
-    title_tfidf_df = pd.DataFrame(title_tfidf.toarray(), columns=[f"title_tfidf_{i}" for i in range(actual_features)])
-    
-    # 6. Combine Features
-    print("Combining all features...")
-    # Select original cols + engineered + encoded
-    # NOTE: demand_score, demand_score_norm, and tag_frequency_score are EXCLUDED
-    # to prevent target leakage (they are used to compute demand_label)
-    core_cols = ["title", "seniority", "category", "geo_tier", "years_exp", "num_skills", 
-                 "has_ai", "has_cloud", "has_backend", "has_frontend", 
-                 "demand_label"]
-    
-    final_df = pd.concat([df[core_cols].reset_index(drop=True), title_tfidf_df], axis=1)
+    # 4. Feature Selection WITHOUT Target-Derived Leakage
+    # NOTE: TF-IDF vectorization is deliberately NOT performed here.
+    # Fitting TF-IDF across the entire dataset before train/test split causes data leakage.
+    # TfidfVectorizer is moved inside the scikit-learn ColumnTransformer in modeling.py.
+    # Tag-derived shortcut flags (has_cloud, has_backend, etc.) are excluded because
+    # they trivially reconstruct the tag-frequency definition of demand_score.
+    core_cols = ["title", "seniority", "category", "geo_tier", "years_exp", "demand_label"]
+    final_df = df[core_cols].copy()
     
     final_df.to_csv(features_path, index=False)
     print(f"\nFinal features dataset saved to {features_path}")
     print(f"Final dataset shape: {final_df.shape}")
-    
-    # Store the preprocessing artifacts
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(tfidf, "models/title_tfidf.joblib")
-    print("Preprocessing artifacts saved to 'models/'")
+    print(f"Final class distribution:\n{final_df['demand_label'].value_counts().to_dict()}")
 
 if __name__ == "__main__":
     RAW_DATA = "data/raw_jobs.csv"

@@ -30,12 +30,16 @@ Holistic analytics dashboard featuring market skill demand distributions (Donut 
 
 ## ✨ Key Highlights
 
-- **🎯 Stacking Ensemble Classifier**: Combines **Random Forest** and **XGBoost** base learners with a logistic regression meta-learner, trained on balanced distributions via **SMOTE**.
-- **⚡ Calibrated Threshold Optimization**: Optimized decision boundary ($Threshold = 0.3626$) maximizing **F1-Score (92.3%)** on high-demand skillsets.
+- **🎯 Fair Multi-Model Benchmark**: Evaluates **Dummy Baselines**, **Random Forest**, **XGBoost**, **Stacking Ensemble**, and **Regularized Logistic Regression** under identical stratified 5-fold CV and locked holdout splits.
+- **🏆 Empirically Selected Architecture**: Regularized **Logistic Regression** ($C=2.0$) selected over complex ensembles due to superior generalization on sparse 200-dimensional TF-IDF text features (**0.9373 ROC-AUC** vs 0.8865 for Stacking).
+- **⚡ Leak-Free Threshold Tuning**: Decision boundary ($Threshold = 0.5181$) optimized strictly via out-of-fold training cross-validation (zero test-set snooping).
 - **🛡️ Secure High-Throughput API**: Built with FastAPI, Pydantic data validation, and `X-API-Key` header authentication.
 - **🎨 Glassmorphic React Dashboard**: High-contrast, dark-mode user interface powered by React 19, Tailwind CSS, and interactive Recharts visualizations.
-- **🔬 Full MLOps Experiment Tracking**: Experiment lineage, dataset logging, hyperparameter tracking, and artifact persistence with **MLflow**.
-- **🚫 Data Leakage Prevention**: Cleaned feature pipeline removing biased proxy variables (e.g., raw tag counts and post-hoc frequency scores).
+- **🔬 Full MLOps Experiment Tracking**: Experiment lineage, parameter logging, cross-validation scores, holdout metrics, and artifact persistence with **MLflow** (`sqlite:///mlflow.db`).
+- **🚫 Rigorous Data Leakage Prevention**:
+  - TF-IDF vectorization encapsulated inside `ColumnTransformer` (vocabulary learned solely from training data).
+  - SMOTE oversampling isolated to training folds inside `imblearn.pipeline.Pipeline`.
+  - Removed circular tag shortcut features (`has_cloud`, `num_skills`, etc.) that trivially reconstructed the target formula.
 
 ---
 
@@ -43,28 +47,27 @@ Holistic analytics dashboard featuring market skill demand distributions (Donut 
 
 ```mermaid
 graph TD
-    subgraph Data & Feature Engineering
-        A[Raw Job Postings] --> B[Text Cleaning & Normalization]
-        B --> C[TF-IDF Title Vectorizer]
-        B --> D[Domain Keyword Flags: AI, Cloud, Backend, Frontend]
-        B --> E[Regex Experience Extraction]
-        C & D & E --> F[Feature Matrix]
+    subgraph Data & Feature Preprocessing
+        A[Raw Job Postings] --> B[Domain Cleaning & Deduplication by Title]
+        B --> C[Clean Feature Matrix: Title, Seniority, Category, Geo Tier, Experience]
     end
 
-    subgraph Machine Learning Pipeline
-        F --> G[SMOTE Synthetic Balancing]
-        G --> H[Random Forest Classifier]
-        G --> I[XGBoost Classifier]
-        H & I --> J[Stacking Meta-Classifier: Logistic Regression]
-        J --> K[Precision-Recall Threshold Tuning]
-        K --> L[Trained Artifacts: demand_model.joblib & threshold.json]
-        J -.-> M[MLflow Experiment Tracking & Metrics]
+    subgraph Leak-Free Machine Learning Pipeline
+        C --> D[Stratified 80/20 Train/Test Split]
+        D -->|Train Split N=416| E[ColumnTransformer: Title TF-IDF + OneHot Encodings]
+        E --> F[SMOTE Training-Only Oversampling]
+        F --> G[5-Fold Stratified Cross-Validation Benchmark]
+        G --> H[Models: Dummy, RF, XGBoost, Stacking, Logistic Regression]
+        G --> I[Out-Of-Fold Precision-Recall Threshold Tuning]
+        I --> J[Trained Pipeline Artifact: demand_model.joblib & threshold.json]
+        G -.-> K[MLflow Experiment Tracking: mlflow.db]
     end
 
-    subgraph API & Client Service
-        L --> N[FastAPI Engine - Port 8001]
-        N --> O[Endpoints: /predict, /insights, /metrics, /history]
-        O --> P[React 19 Dashboard - Port 5173]
+    subgraph Holdout Evaluation & Serving
+        D -->|Locked Test Split N=104| L[Final Holdout Evaluation]
+        J --> M[FastAPI Engine - Port 8001]
+        M --> N[Endpoints: /predict, /insights, /metrics, /history]
+        N --> O[React 19 Dashboard - Port 5173]
     end
 ```
 
@@ -72,16 +75,19 @@ graph TD
 
 ## 📊 Model Evaluation & Benchmarks
 
-The model was evaluated using a stratified 80/20 train-test split, prioritizing recruiter reliability by minimizing false negatives on high-demand roles:
+All models were evaluated under identical conditions on the **untouched holdout test set** ($N = 104$: 55 High Demand, 49 Low Demand). The decision threshold was chosen strictly using 5-fold cross-validation on `X_train`:
 
-| Metric | Score | Description |
-| :--- | :--- | :--- |
-| **Accuracy** | **91.35%** | Overall classification correctness across all job classes |
-| **Precision** | **87.10%** | Reliability of positive (High-Demand) predictions |
-| **Recall** | **98.18%** | Coverage of actual high-demand opportunities |
-| **F1-Score** | **92.31%** | Harmonic mean optimizing the precision-recall balance |
-| **ROC AUC** | **96.25%** | Area under the Receiver Operating Characteristic curve |
-| **Optimal Threshold** | **0.3626** | Tuned cut-off maximizing F1 performance on minority class |
+| Model Architecture | Threshold Strategy | Threshold | Test Accuracy | Precision (High) | Recall (High) | F1-Score (High) | Macro F1 | ROC AUC | Confusion Matrix `[TN, FP, FN, TP]` |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Dummy (Most Frequent)** | Baseline | 1.0000 | 52.88% | 52.88% | 100.00% | 69.18% | 34.59% | 0.5000 | `[0, 49, 0, 55]` |
+| **Dummy (Stratified)** | Baseline | Random | 52.88% | 52.88% | 100.00% | 69.18% | 34.59% | 0.4666 | `[0, 49, 0, 55]` |
+| **Random Forest (Tuned + SMOTE)** | Train CV OOF | 0.4597 | 77.88% | 83.33% | 72.73% | 77.67% | 77.72% | 0.8879 | `[41, 8, 15, 40]` |
+| **XGBoost (Tuned + SMOTE)** | Train CV OOF | 0.4157 | 81.73% | 80.00% | 87.27% | 83.48% | 81.60% | 0.8785 | `[37, 12, 7, 48]` |
+| **Stacking (RF + XGB + SMOTE)** | Train CV OOF | 0.4696 | 79.81% | 82.69% | 78.18% | 80.37% | 79.76% | 0.8865 | `[40, 9, 12, 43]` |
+| **Logistic Regression (Selected Best)** | **Train CV OOF** | **0.5181** | **84.62%** | **88.24%** | **81.82%** | **84.91%** | **84.61%** | **0.9373** | `[43, 6, 10, 45]` |
+
+### Architectural Insight: Why Linear Outperforms Ensembles Here
+In a sparse 200-dimensional text vector space with a moderate training set ($N = 416$), tree-based models and stacking struggle with variance and axis-aligned splits over high-dimensional bag-of-words indicators. L2-regularized Logistic Regression ($C=2.0$) provides the optimal inductive bias, achieving **0.9373 ROC-AUC** with superior precision (**88.24%**) and robust calibration.
 
 ---
 
@@ -117,7 +123,7 @@ curl -X POST "http://localhost:8001/predict" \
     "seniority": "Senior",
     "category": "ML Engineering",
     "geo_tier": "Tier 1",
-    "tags": ["Python", "PyTorch", "Kubernetes", "AWS", "LLMs"]
+    "tags": ["Python", "PyTorch", "Kubernetes", "AWS"]
   }'
 ```
 
@@ -126,9 +132,9 @@ curl -X POST "http://localhost:8001/predict" \
 ```json
 {
   "prediction": 1,
-  "probability": 0.955,
-  "demand_score": 0.955,
-  "threshold": 0.3626,
+  "probability": 0.7553,
+  "demand_score": 0.7553,
+  "threshold": 0.5181,
   "label": "High Demand Skillset",
   "experience_detected": 0
 }
